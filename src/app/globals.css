@@ -2,26 +2,131 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #F6F8FA;
+    --foreground: #0F1B2D;
+
+    --card: #FFFFFF;
+    --card-foreground: #0F1B2D;
+
+    --popover: #FFFFFF;
+    --popover-foreground: #0F1B2D;
+
+    --primary: #1E5AA8;
+    --primary-foreground: #FFFFFF;
+    --primary-hover: #184886;
+
+    --secondary: #F1F4F8;
+    --secondary-foreground: #0F1B2D;
+
+    --muted: #EAEFF5;
+    --muted-foreground: #5B6B7F;
+
+    --accent: #F5A623;
+    --accent-foreground: #1A1204;
+
+    --success: #16A34A;
+    --success-foreground: #166534;
+    --success-bg: #E8F6EE;
+
+    --warning: #D97706;
+    --warning-foreground: #92400E;
+    --warning-bg: #FEF3C7;
+
+    --destructive: #DC2626;
+    --destructive-foreground: #991B1B;
+    --destructive-bg: #FEE2E2;
+
+    --info: #0284C7;
+    --info-foreground: #0369A1;
+    --info-bg: #E0F2FE;
+
+    --border: #E3E8EE;
+    --input: #D5DCE5;
+    --ring: #1E5AA8;
+
+    --radius: 8px;
+  }
+
+  .dark {
+    --background: #0B1220;
+    --foreground: #E6EDF7;
+
+    --card: #111A2B;
+    --card-foreground: #E6EDF7;
+
+    --popover: #111A2B;
+    --popover-foreground: #E6EDF7;
+
+    --primary: #4C8DFF;
+    --primary-foreground: #FFFFFF;
+    --primary-hover: #3b76e0;
+
+    --secondary: #162238;
+    --secondary-foreground: #E6EDF7;
+
+    --muted: #1A263D;
+    --muted-foreground: #93A4BD;
+
+    --accent: #FBBF24;
+    --accent-foreground: #1A1204;
+
+    --success: #34D399;
+    --success-foreground: #A7F3D0;
+    --success-bg: #064E3B;
+
+    --warning: #FBBF24;
+    --warning-foreground: #FDE68A;
+    --warning-bg: #78350F;
+
+    --destructive: #F87171;
+    --destructive-foreground: #FECACA;
+    --destructive-bg: #7F1D1D;
+
+    --info: #38BDF8;
+    --info-foreground: #BAE6FD;
+    --info-bg: #0C4A6E;
+
+    --border: #22304A;
+    --input: #22304A;
+    --ring: #4C8DFF;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Tabular figures for numbers, currency, timestamps and odometers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glassmorphism allowed only for overlays, sticky nav and mobile bottom bar */
+.glass-surface {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(227, 232, 238, 0.8);
+}
+
+.dark .glass-surface {
+  background-color: rgba(17, 26, 43, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(34, 48, 74, 0.8);
+}
+
+/* Prevent text overflow in data containers */
+.truncate-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
