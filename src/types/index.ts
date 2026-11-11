@@ -379,3 +379,138 @@ export interface TripsPerTruckReport {
   trucks: TruckReportStat[];
 }
 
+// ── Advancement C: Trip Profit Sheet ──────────────────────────────────────────
+
+export interface TripProfitRow {
+  id: number;
+  reference: string;
+  date: string;
+  truck_reg: string;
+  driver_name: string;
+  customer_name: string;
+  route: string;
+  revenue: number;
+  fuel: number;
+  allowance: number;
+  tolls_levies: number;
+  other_direct: number;
+  total_direct_costs: number;
+  contribution: number;
+  margin_pct: number | null;
+  is_negative: boolean;
+  pending_expenses_count: number;
+  month_group: string;
+  status: string;
+}
+
+export interface TripProfitSummary {
+  trips_count: number;
+  revenue: number;
+  fuel_cost: number;
+  allowance_cost: number;
+  tolls_levies_cost: number;
+  other_direct_cost: number;
+  total_direct_costs: number;
+  contribution: number;
+  margin_pct: number | null;
+  avg_contribution_per_trip: number;
+  pending_expenses_count: number;
+  total_km: number;
+}
+
+export interface TripProfitGroup {
+  group_key: string;
+  group_type: string;
+  label: string;
+  subtotal: TripProfitSummary;
+  items: TripProfitRow[];
+}
+
+export interface TruckSummary {
+  truck_reg: string;
+  truck_id: number;
+  trips_made: number;
+  total_km: number;
+  revenue: number;
+  direct_costs: number;
+  contribution: number;
+  margin_pct: number | null;
+  contribution_per_trip: number;
+}
+
+export interface TripProfitReport {
+  summary: TripProfitSummary;
+  trips: TripProfitRow[];
+  all_matching_trips: TripProfitRow[];
+  groups: TripProfitGroup[];
+  filters_applied: Record<string, unknown>;
+  pagination: {
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+  };
+  truck_summaries: TruckSummary[];
+}
+
+export interface ReportExport {
+  id: number;
+  status: 'queued' | 'processing' | 'ready' | 'failed';
+  format: 'pdf' | 'csv';
+  scope: 'filtered' | 'all';
+  row_count: number;
+  file_name?: string;
+  download_url?: string;
+  error_message?: string;
+}
+
+// ── Advancement C: Missing Entries ────────────────────────────────────────────
+
+export interface DataIssue {
+  id: number;
+  rule_key: string;
+  subject_type: string;
+  subject_id: number;
+  truck?: { id: number; reg_number: string } | null;
+  driver?: { id: number; name: string } | null;
+  trip?: { id: number; reference: string; route: string } | null;
+  status: 'open' | 'resolved' | 'dismissed';
+  detected_at: string;
+  days_outstanding: number;
+  resolved_at?: string | null;
+  dismissed_reason?: string | null;
+  dismissed_by?: string | null;
+  assigned_to?: { id: number; name: string } | null;
+  meta: Record<string, unknown>;
+}
+
+export interface MissingEntriesSummary {
+  total_open: number;
+  by_category: Record<string, number>;
+  oldest_age_days: number;
+  data_completeness_pct: number;
+  total_trips: number;
+  clean_trips: number;
+}
+
+export interface MissingEntriesResponse {
+  data: DataIssue[];
+  summary: MissingEntriesSummary;
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+export interface OrganizationRuleSetting {
+  rule_key: string;
+  label: string;
+  category: string;
+  enabled: boolean;
+  threshold_days: number | null;
+  threshold_amount: number | null;
+  description: string;
+}
+

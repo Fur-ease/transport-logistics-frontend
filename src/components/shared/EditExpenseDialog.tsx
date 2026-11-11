@@ -163,7 +163,14 @@ export function EditExpenseDialog({
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 py-2">
+          <form
+            onSubmit={handleSubmit(onSubmit, (errs) => {
+              console.error('Edit expense validation failed:', errs);
+              const first = Object.values(errs)[0];
+              toast.error(first?.message ? String(first.message) : 'Please check form fields');
+            })}
+            className="space-y-3.5 py-2"
+          >
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Category *</label>
               <select
@@ -186,7 +193,9 @@ export function EditExpenseDialog({
               <Input
                 type="number"
                 step="1"
-                {...register('amount', { valueAsNumber: true })}
+                {...register('amount', {
+                  setValueAs: (v) => (v === '' || v === undefined ? 0 : Number(v)),
+                })}
                 className={errors.amount ? 'border-destructive' : ''}
               />
               {errors.amount && <p className="text-[11px] text-destructive mt-1">{errors.amount.message}</p>}
@@ -200,16 +209,22 @@ export function EditExpenseDialog({
                     type="number"
                     step="0.1"
                     placeholder="e.g. 120"
-                    {...register('litres', { valueAsNumber: true })}
+                    {...register('litres', {
+                      setValueAs: (v) => (v === '' || v === undefined || v === null ? null : Number(v)),
+                    })}
                   />
+                  {errors.litres && <p className="text-[11px] text-destructive mt-1">{errors.litres.message}</p>}
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-foreground block mb-1">Odometer at Fill</label>
                   <Input
                     type="number"
                     placeholder="e.g. 142100"
-                    {...register('odometer_at_fill', { valueAsNumber: true })}
+                    {...register('odometer_at_fill', {
+                      setValueAs: (v) => (v === '' || v === undefined || v === null ? null : Number(v)),
+                    })}
                   />
+                  {errors.odometer_at_fill && <p className="text-[11px] text-destructive mt-1">{errors.odometer_at_fill.message}</p>}
                 </div>
               </div>
             )}

@@ -41,6 +41,14 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [range, setRange] = useState<'30' | '90' | 'this_month'>('30');
 
+  const { data: missingResponse } = useQuery<{
+    summary: { total_open: number; data_completeness_pct: number };
+  }>({
+    queryKey: ['missing-entries-summary'],
+    queryFn: () => api.get('/missing-entries?per_page=1'),
+  });
+  const missingSummary = missingResponse?.summary;
+
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', range],
     queryFn: () => {
@@ -168,6 +176,31 @@ export default function DashboardPage() {
             icon={<AlertTriangle className="h-5 w-5" />}
             valueClassName={stats?.kpis.overdue_count ? 'text-destructive font-semibold' : undefined}
           />
+        </div>
+      )}
+
+      {/* Advancement C: Missing Entries Fleet Alert */}
+      {missingSummary && missingSummary.total_open > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">
+                {missingSummary.total_open} Incomplete Fleet Entries Detected
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Incomplete fuel receipts, unbilled deliveries, or overdue documents affect profit sheets ({missingSummary.data_completeness_pct}% completeness).
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 shrink-0">
+            <Link href="/operations/missing-entries">
+              <span>Fix Missing Entries</span>
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+            </Link>
+          </Button>
         </div>
       )}
 

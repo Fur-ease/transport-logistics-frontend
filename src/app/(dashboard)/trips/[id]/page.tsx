@@ -74,10 +74,10 @@ const expenseSchema = z.object({
     'other',
   ]),
   amount: z.number().min(1, 'Amount in KES is required'),
-  litres: z.number().optional(),
-  odometer_at_fill: z.number().optional(),
+  litres: z.number().optional().nullable(),
+  odometer_at_fill: z.number().optional().nullable(),
   incurred_at: z.string().min(1, 'Date and time required'),
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(),
 });
 
 type ExpenseFormData = z.infer<typeof expenseSchema>;
@@ -106,6 +106,19 @@ export default function TripDetailPage() {
 
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<File | null>(null);
+
+  const openAddExpenseModal = () => {
+    resetExpenseForm({
+      category: 'fuel',
+      incurred_at: new Date().toISOString().slice(0, 16),
+      amount: 5000,
+      litres: undefined,
+      odometer_at_fill: undefined,
+      notes: '',
+    });
+    setSelectedReceipt(null);
+    setAddExpenseOpen(true);
+  };
 
   // Reassign modal state
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
@@ -154,6 +167,13 @@ export default function TripDetailPage() {
     queryFn: () => api.get<{ data: TripPnLResponse }>(`/trips/${tripId}/pnl`),
   });
 
+  // Advancement C: Missing entries query for this trip
+  const { data: tripIssuesResponse } = useQuery<{ data: Array<{ id: number; rule_key: string }> }>({
+    queryKey: ['trip-issues', tripId],
+    queryFn: () => api.get(`/missing-entries?trip_id=${tripId}&status=open`),
+  });
+  const tripIssues = tripIssuesResponse?.data || [];
+
   // Fetch all trips list for reassignment target select
   const { data: allTripsData } = useQuery<{ data: Trip[] }>({
     queryKey: ['all-trips-select'],
@@ -187,8 +207,12 @@ export default function TripDetailPage() {
       const data = new FormData();
       data.append('category', formData.category);
       data.append('amount', String(formData.amount));
-      if (formData.litres) data.append('litres', String(formData.litres));
-      if (formData.odometer_at_fill) data.append('odometer_at_fill', String(formData.odometer_at_fill));
+      if (formData.litres !== undefined && formData.litres !== null && !isNaN(formData.litres)) {
+        data.append('litres', String(formData.litres));
+      }
+      if (formData.odometer_at_fill !== undefined && formData.odometer_at_fill !== null && !isNaN(formData.odometer_at_fill)) {
+        data.append('odometer_at_fill', String(formData.odometer_at_fill));
+      }
       data.append('incurred_at', formData.incurred_at);
       if (formData.notes) data.append('notes', formData.notes);
       if (selectedReceipt) data.append('receipt', selectedReceipt);
@@ -199,9 +223,18 @@ export default function TripDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
       queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['missing-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['trip-issues', tripId] });
       toast.success('Expense recorded successfully');
       setAddExpenseOpen(false);
-      resetExpenseForm();
+      resetExpenseForm({
+        category: 'fuel',
+        incurred_at: new Date().toISOString().slice(0, 16),
+        amount: 5000,
+        litres: undefined,
+        odometer_at_fill: undefined,
+        notes: '',
+      });
       setSelectedReceipt(null);
     },
     onError: (err: Error) => {
@@ -356,7 +389,7 @@ export default function TripDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setAddExpenseOpen(true)}
+              onClick={openAddExpenseModal}
             >
               <Plus className="mr-1.5 h-4 w-4" />
               <span>Add Expense</span>
@@ -364,6 +397,23 @@ export default function TripDetailPage() {
           </div>
         }
       />
+
+      {/* Advancement C: Missing entries warning banner */}
+      {tripIssues.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              <strong>Data Quality Warning:</strong> {tripIssues.length} entry issue{tripIssues.length > 1 ? 's' : ''} detected on this trip. Profit sheet calculations may be incomplete.
+            </span>
+          </div>
+          <Button asChild size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 shrink-0 h-7 text-xs">
+            <Link href={`/operations/missing-entries?trip_id=${tripId}&status=open`}>
+              <span>Review &amp; Fix</span>
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Stepper tracking Trip Lifecycle */}
       <Card className="p-4 bg-card">
@@ -462,7 +512,7 @@ export default function TripDetailPage() {
                     Fuel, driver per diems, tolls, cess, and emergency repairs incurred on this trip
                   </CardDescription>
                 </div>
-                <Button size="sm" onClick={() => setAddExpenseOpen(true)}>
+                <Button size="sm" onClick={openAddExpenseModal}>
                   <Plus className="mr-1.5 h-4 w-4" />
                   <span>Add Expense</span>
                 </Button>
@@ -753,7 +803,17 @@ export default function TripDetailPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={handleSubmit((d) => expenseMutation.mutate(d))} className="space-y-4 py-4">
+          <form
+            onSubmit={handleSubmit(
+              (d) => expenseMutation.mutate(d),
+              (errors) => {
+                console.error('Validation errors on expense submission:', errors);
+                const firstErr = Object.values(errors)[0];
+                toast.error(firstErr?.message ? String(firstErr.message) : 'Please check expense form fields');
+              }
+            )}
+            className="space-y-4 py-4"
+          >
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Expense Category</label>
               <select
@@ -762,7 +822,7 @@ export default function TripDetailPage() {
               >
                 <option value="fuel">Fuel (Diesel Refill)</option>
                 <option value="allowance">Driver Allowance (Per Diem)</option>
-                <option value="toll">Toll & Weighing Cess</option>
+                <option value="toll">Toll &amp; Weighing Cess</option>
                 <option value="county_levy_cess">County Levy / Cess</option>
                 <option value="border_fees">Border Clearance Fees</option>
                 <option value="loading_offloading">Loading / Offloading</option>
@@ -773,7 +833,14 @@ export default function TripDetailPage() {
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Amount (KES)</label>
-              <Input type="number" step="10" {...register('amount', { valueAsNumber: true })} />
+              <Input
+                type="number"
+                step="10"
+                placeholder="e.g. 5000"
+                {...register('amount', {
+                  setValueAs: (v) => (v === '' || v === undefined ? 0 : Number(v)),
+                })}
+              />
               {expenseErrors.amount && (
                 <p className="text-[11px] text-destructive mt-1">{expenseErrors.amount.message}</p>
               )}
@@ -783,19 +850,41 @@ export default function TripDetailPage() {
             {watchCategory === 'fuel' && (
               <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-secondary/50 border border-border">
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1">Litres Filled</label>
-                  <Input type="number" step="0.1" placeholder="e.g. 150" {...register('litres', { valueAsNumber: true })} />
+                  <label className="text-xs font-semibold text-foreground block mb-1">Litres Filled (Optional)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g. 150"
+                    {...register('litres', {
+                      setValueAs: (v) => (v === '' || v === undefined || v === null ? null : Number(v)),
+                    })}
+                  />
+                  {expenseErrors.litres && (
+                    <p className="text-[11px] text-destructive mt-1">{expenseErrors.litres.message}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1">Odometer at Pump</label>
-                  <Input type="number" placeholder="KM" {...register('odometer_at_fill', { valueAsNumber: true })} />
+                  <label className="text-xs font-semibold text-foreground block mb-1">Odometer at Pump (Optional)</label>
+                  <Input
+                    type="number"
+                    placeholder="KM reading"
+                    {...register('odometer_at_fill', {
+                      setValueAs: (v) => (v === '' || v === undefined || v === null ? null : Number(v)),
+                    })}
+                  />
+                  {expenseErrors.odometer_at_fill && (
+                    <p className="text-[11px] text-destructive mt-1">{expenseErrors.odometer_at_fill.message}</p>
+                  )}
                 </div>
               </div>
             )}
 
             <div>
-              <label className="text-xs font-semibold text-foreground block mb-1">Date & Time Incurred</label>
+              <label className="text-xs font-semibold text-foreground block mb-1">Date &amp; Time Incurred</label>
               <Input type="datetime-local" {...register('incurred_at')} />
+              {expenseErrors.incurred_at && (
+                <p className="text-[11px] text-destructive mt-1">{expenseErrors.incurred_at.message}</p>
+              )}
             </div>
 
             {/* Receipt Upload with Camera Capture */}
