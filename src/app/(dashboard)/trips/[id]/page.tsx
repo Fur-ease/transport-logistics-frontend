@@ -9,7 +9,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   MapPin,
-  Truck,
   User,
   Building2,
   Calendar,
@@ -24,6 +23,8 @@ import {
   Receipt,
   FileCheck,
   ArrowRight,
+  Edit3,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -32,6 +33,10 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { MoneyText } from '@/components/shared/MoneyText';
 import { FileUpload } from '@/components/shared/FileUpload';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { EditTripSheet } from '@/components/shared/EditTripSheet';
+import { EditExpenseDialog } from '@/components/shared/EditExpenseDialog';
+import { AdvanceAdjustmentDialog } from '@/components/shared/AdvanceAdjustmentDialog';
+import { HistoryTimeline } from '@/components/shared/HistoryTimeline';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -54,7 +59,7 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
 import { formatKES, formatKm, formatDate, formatDateTime } from '@/lib/formatters';
-import { Trip, TripExpense, DriverAdvance } from '@/types';
+import { Trip, TripExpense, DriverAdvance, Truck, Driver, Customer } from '@/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 const expenseSchema = z.object({
@@ -117,10 +122,30 @@ export default function TripDetailPage() {
   const [selectedAdvance, setSelectedAdvance] = useState<DriverAdvance | null>(null);
   const [returnedAmount, setReturnedAmount] = useState<number | ''>('');
 
+  // Safe editing states
+  const [editTripSheetOpen, setEditTripSheetOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<TripExpense | null>(null);
+  const [adjustingAdvance, setAdjustingAdvance] = useState<DriverAdvance | null>(null);
+  const [activeBottomTab, setActiveBottomTab] = useState<'expenses' | 'history'>('expenses');
+
   // Fetch Trip details
   const { data: tripData, isLoading: isTripLoading } = useQuery<{ data: Trip }>({
     queryKey: ['trip', tripId],
     queryFn: () => api.get<{ data: Trip }>(`/trips/${tripId}`),
+  });
+
+  // Fetch fleet options for edit sheet
+  const { data: trucksData } = useQuery<{ data: Truck[] }>({
+    queryKey: ['trucks-select'],
+    queryFn: () => api.get<{ data: Truck[] }>('/trucks'),
+  });
+  const { data: driversData } = useQuery<{ data: Driver[] }>({
+    queryKey: ['drivers-select'],
+    queryFn: () => api.get<{ data: Driver[] }>('/drivers'),
+  });
+  const { data: customersData } = useQuery<{ data: Customer[] }>({
+    queryKey: ['customers-select'],
+    queryFn: () => api.get<{ data: Customer[] }>('/customers'),
   });
 
   // Fetch Trip P&L
@@ -270,7 +295,16 @@ export default function TripDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${trip.reference} — ${trip.origin} to ${trip.destination}`}
+        title={
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span>{trip.reference} — {trip.origin} to {trip.destination}</span>
+            {(trip.version ?? 1) > 1 && (
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                Edited v{trip.version}
+              </span>
+            )}
+          </div>
+        }
         description={`${trip.customer?.name} • Cargo: ${trip.cargo_description} (${trip.cargo_weight_tons} tons) • Rate: ${formatKES(trip.agreed_rate)}`}
         breadcrumbs={[
           { label: 'Trips & Dispatch', href: '/trips' },
@@ -278,6 +312,14 @@ export default function TripDetailPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditTripSheetOpen(true)}
+            >
+              <Edit3 className="mr-1.5 h-4 w-4" />
+              <span>Edit Details</span>
+            </Button>
             {trip.status === 'planned' && (
               <Button
                 size="sm"
@@ -380,124 +422,167 @@ export default function TripDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Itemised Trip Expenses Section */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-base">Trip Direct Expenses</CardTitle>
-                <CardDescription>
-                  Fuel, driver per diems, tolls, cess, and emergency repairs incurred on this trip
-                </CardDescription>
-              </div>
-              <Button size="sm" onClick={() => setAddExpenseOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" />
-                <span>Add Expense</span>
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
-                    <tr>
-                      <th className="py-2.5 px-4 text-left font-medium">Category</th>
-                      <th className="py-2.5 px-4 text-left font-medium">Details / Fuel Analysis</th>
-                      <th className="py-2.5 px-4 text-right font-medium">Amount</th>
-                      <th className="py-2.5 px-4 text-center font-medium">Status</th>
-                      <th className="py-2.5 px-4 text-right font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {trip.expenses?.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="p-6 text-center text-xs text-muted-foreground">
-                          No direct expenses recorded yet for this trip.
-                        </td>
-                      </tr>
-                    ) : (
-                      trip.expenses?.map((exp) => (
-                        <tr key={exp.id} className="hover:bg-muted/40 transition-colors">
-                          <td className="py-3 px-4">
-                            <span className="font-semibold text-foreground capitalize block">
-                              {exp.category.replace(/_/g, ' ')}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {formatDateTime(exp.incurred_at)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-xs">
-                            {exp.category === 'fuel' && exp.litres ? (
-                              <div className="space-y-1">
-                                <span className="font-mono text-muted-foreground">
-                                  {exp.litres} L @ Odo {exp.odometer_at_fill || 'N/A'}
-                                </span>
-                                {exp.fuel_analysis && exp.fuel_analysis.is_anomaly && (
-                                  <div className="flex items-center gap-1 text-[11px] font-bold text-destructive">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                    <span>
-                                      Anomaly: {exp.fuel_analysis.km_per_litre} km/L ({exp.fuel_analysis.deviation_pct}% below rolling avg)
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                Entered by {exp.entered_by_name || 'Staff'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right font-mono font-semibold">
-                            <MoneyText amount={exp.amount} size="base" />
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <StatusBadge status={exp.status} />
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {exp.status === 'pending' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success-bg"
-                                    onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'approved' })}
-                                  >
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive-bg"
-                                    onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'rejected', reason: 'Disallowed by accountant' })}
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
+          {/* Tabs for Direct Expenses vs Audit History */}
+          <div className="flex items-center gap-2 border-b border-border pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveBottomTab('expenses')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                activeBottomTab === 'expenses'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+              }`}
+            >
+              Direct Expenses ({trip.expenses?.length ?? 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveBottomTab('history')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${
+                activeBottomTab === 'history'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+              }`}
+            >
+              <History className="h-3.5 w-3.5" />
+              <span>Audit History</span>
+            </button>
+          </div>
 
-                              {/* Reassign Misassigned Expense to Another Trip */}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                onClick={() => {
-                                  setExpenseToReassign(exp);
-                                  setReassignModalOpen(true);
-                                }}
-                                title="Reassign to another trip"
-                              >
-                                <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                                Reassign
-                              </Button>
-                            </div>
+          {activeBottomTab === 'history' ? (
+            <Card className="p-4">
+              <HistoryTimeline auditableType="trip" auditableId={trip.id} />
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base">Trip Direct Expenses</CardTitle>
+                  <CardDescription>
+                    Fuel, driver per diems, tolls, cess, and emergency repairs incurred on this trip
+                  </CardDescription>
+                </div>
+                <Button size="sm" onClick={() => setAddExpenseOpen(true)}>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  <span>Add Expense</span>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
+                      <tr>
+                        <th className="py-2.5 px-4 text-left font-medium">Category</th>
+                        <th className="py-2.5 px-4 text-left font-medium">Details / Fuel Analysis</th>
+                        <th className="py-2.5 px-4 text-right font-medium">Amount</th>
+                        <th className="py-2.5 px-4 text-center font-medium">Status</th>
+                        <th className="py-2.5 px-4 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {trip.expenses?.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-6 text-center text-xs text-muted-foreground">
+                            No direct expenses recorded yet for this trip.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                      ) : (
+                        trip.expenses?.map((exp) => (
+                          <tr key={exp.id} className="hover:bg-muted/40 transition-colors">
+                            <td className="py-3 px-4">
+                              <span className="font-semibold text-foreground capitalize block">
+                                {exp.category.replace(/_/g, ' ')}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {formatDateTime(exp.incurred_at)}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-xs">
+                              {exp.category === 'fuel' && exp.litres ? (
+                                <div className="space-y-1">
+                                  <span className="font-mono text-muted-foreground">
+                                    {exp.litres} L @ Odo {exp.odometer_at_fill || 'N/A'}
+                                  </span>
+                                  {exp.fuel_analysis && exp.fuel_analysis.is_anomaly && (
+                                    <div className="flex items-center gap-1 text-[11px] font-bold text-destructive">
+                                      <AlertTriangle className="h-3.5 w-3.5" />
+                                      <span>
+                                        Anomaly: {exp.fuel_analysis.km_per_litre} km/L ({exp.fuel_analysis.deviation_pct}% below rolling avg)
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  Entered by {exp.entered_by_name || 'Staff'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-semibold">
+                              <MoneyText amount={exp.amount} size="base" />
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <StatusBadge status={exp.status} />
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                  onClick={() => setEditingExpense(exp)}
+                                  title="Edit expense details"
+                                >
+                                  <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                  Edit
+                                </Button>
+
+                                {exp.status === 'pending' && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success-bg"
+                                      onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'approved' })}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive-bg"
+                                      onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'rejected', reason: 'Disallowed by accountant' })}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+
+                                {/* Reassign Misassigned Expense to Another Trip */}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                  onClick={() => {
+                                    setExpenseToReassign(exp);
+                                    setReassignModalOpen(true);
+                                  }}
+                                  title="Reassign to another trip"
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                  Reassign
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right 1 Col: Trip P&L Card & Driver Advance Settlement */}
@@ -603,6 +688,24 @@ export default function TripDetailPage() {
                       />
                     </div>
 
+                    {/* Advance Adjustments Trail (if any) */}
+                    {adv.adjustments && adv.adjustments.length > 0 && (
+                      <div className="p-2.5 rounded-lg bg-secondary/60 border border-border space-y-1.5 my-2">
+                        <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider block">
+                          Adjustment Trail
+                        </span>
+                        {adv.adjustments.map((adj) => (
+                          <div key={adj.id} className="text-[11px] flex justify-between items-start border-t border-border/40 pt-1">
+                            <div>
+                              <span className="font-semibold text-foreground">{adj.type === 'additional_advance' ? '+ KES ' : '- KES '}{adj.amount.toLocaleString()}</span>
+                              <p className="text-[10px] text-muted-foreground">{adj.reason}</p>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">{adj.created_at?.slice(0, 10)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {adv.status === 'open' && (
                       <Button
                         size="sm"
@@ -614,6 +717,18 @@ export default function TripDetailPage() {
                         }}
                       >
                         Reconcile & Settle Advance
+                      </Button>
+                    )}
+
+                    {adv.status === 'settled' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-2"
+                        onClick={() => setAdjustingAdvance(adv)}
+                      >
+                        <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                        Post Advance Adjustment
                       </Button>
                     )}
                   </div>
@@ -882,6 +997,32 @@ export default function TripDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Safe Editing Sheet and Dialogs */}
+      <EditTripSheet
+        trip={trip}
+        trucks={trucksData?.data ?? []}
+        drivers={driversData?.data ?? []}
+        customers={customersData?.data ?? []}
+        open={editTripSheetOpen}
+        onOpenChange={setEditTripSheetOpen}
+      />
+
+      <EditExpenseDialog
+        expense={editingExpense}
+        open={!!editingExpense}
+        onOpenChange={(open) => {
+          if (!open) setEditingExpense(null);
+        }}
+      />
+
+      <AdvanceAdjustmentDialog
+        advance={adjustingAdvance}
+        open={!!adjustingAdvance}
+        onOpenChange={(open) => {
+          if (!open) setAdjustingAdvance(null);
+        }}
+      />
     </div>
   );
 }

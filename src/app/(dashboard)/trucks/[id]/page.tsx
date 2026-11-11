@@ -29,6 +29,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatCard } from '@/components/shared/StatCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { MoneyText } from '@/components/shared/MoneyText';
+import { HistoryTimeline } from '@/components/shared/HistoryTimeline';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -133,14 +134,15 @@ export default function TruckDetailPage() {
         />
       </div>
 
-      {/* 5 Tabs: Overview, Trips, Fuel, Maintenance, Documents */}
+      {/* 6 Tabs: Overview, Trips, Fuel, Maintenance, Documents, History */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto p-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="trips">Trips ({truck.trips?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="fuel">Fuel Logs</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance ({truck.maintenance_records?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="documents">Compliance ({truck.compliance_documents?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview with Trips-over-time Chart */}
@@ -481,6 +483,19 @@ export default function TruckDetailPage() {
                 </table>
               </div>
             </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 6: History & Audit Timeline */}
+        <TabsContent value="history" className="space-y-4 mt-4">
+          <Card className="p-4">
+            <CardHeader className="px-0 pt-0 pb-3">
+              <CardTitle className="text-base">Truck Change & Audit History</CardTitle>
+              <CardDescription>
+                Detailed field-level audit trail of status, odometer, and specification edits.
+              </CardDescription>
+            </CardHeader>
+            <HistoryTimeline auditableType="truck" auditableId={truck.id} />
           </Card>
         </TabsContent>
       </Tabs>

@@ -210,9 +210,16 @@ export default function TripsPage() {
               {trips.map((trip) => (
                 <tr key={trip.id} className="hover:bg-muted/40 transition-colors">
                   <td className="py-3.5 px-4 font-mono font-bold text-primary">
-                    <Link href={`/trips/${trip.id}`} className="hover:underline">
-                      {trip.reference}
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link href={`/trips/${trip.id}`} className="hover:underline">
+                        {trip.reference}
+                      </Link>
+                      {(trip.version ?? 1) > 1 && (
+                        <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20" title={`Version ${trip.version} (Edited)`}>
+                          v{trip.version}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 px-4">
                     <p className="font-semibold text-foreground">{trip.origin} → {trip.destination}</p>

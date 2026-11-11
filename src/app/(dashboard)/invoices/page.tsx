@@ -16,12 +16,19 @@ import {
   Building2,
   Calendar,
   Plus,
+  FileBadge,
+  Ban,
+  Eye,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { MoneyText } from '@/components/shared/MoneyText';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { VoidPaymentDialog } from '@/components/shared/VoidPaymentDialog';
+import { CreditNoteDialog } from '@/components/shared/CreditNoteDialog';
+import { HistoryTimeline } from '@/components/shared/HistoryTimeline';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import {
@@ -34,8 +41,8 @@ import {
 } from '@/components/ui/Dialog';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
-import { formatKES, formatDate } from '@/lib/formatters';
-import { Invoice } from '@/types';
+import { formatKES, formatDate, formatDateTime } from '@/lib/formatters';
+import { Invoice, Payment } from '@/types';
 
 const paymentSchema = z.object({
   amount: z.number().min(1, 'Payment amount required'),
@@ -52,6 +59,11 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  // Safe editing & audit dialog states
+  const [creditNoteInvoice, setCreditNoteInvoice] = useState<Invoice | null>(null);
+  const [voidingPayment, setVoidingPayment] = useState<Payment | null>(null);
+  const [detailsModalInvoice, setDetailsModalInvoice] = useState<Invoice | null>(null);
 
   const { data, isLoading } = useQuery<{ data: Invoice[] }>({
     queryKey: ['invoices', statusFilter, search],
@@ -174,7 +186,19 @@ export default function InvoicesPage() {
                     }`}
                   >
                     <td className="py-3.5 px-4 font-mono font-bold text-primary">
-                      {inv.number}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>{inv.number}</span>
+                        {(inv.version ?? 1) > 1 && (
+                          <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20">
+                            v{inv.version}
+                          </span>
+                        )}
+                        {(inv.total_credited ?? 0) > 0 && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                            -KES {inv.total_credited?.toLocaleString()} credited
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-foreground">
                       {inv.customer?.name}
@@ -210,21 +234,38 @@ export default function InvoicesPage() {
                       <StatusBadge status={inv.status} />
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      {inv.status !== 'paid' ? (
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {inv.status !== 'paid' && (
+                          <Button
+                            size="sm"
+                            onClick={() => openPaymentModal(inv)}
+                            className="h-7 px-2.5 text-xs font-semibold"
+                          >
+                            <DollarSign className="mr-1 h-3.5 w-3.5" />
+                            <span>Pay</span>
+                          </Button>
+                        )}
                         <Button
                           size="sm"
-                          onClick={() => openPaymentModal(inv)}
-                          className="h-8 text-xs font-semibold"
+                          variant="outline"
+                          onClick={() => setCreditNoteInvoice(inv)}
+                          className="h-7 px-2 text-xs"
+                          title="Issue Credit Note"
                         >
-                          <DollarSign className="mr-1 h-3.5 w-3.5" />
-                          <span>Record Payment</span>
+                          <FileBadge className="h-3.5 w-3.5 mr-1" />
+                          <span>Credit Note</span>
                         </Button>
-                      ) : (
-                        <span className="text-xs text-success font-medium inline-flex items-center gap-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Settled</span>
-                        </span>
-                      )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDetailsModalInvoice(inv)}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          title="View Payments, Credit Notes & Audit Trail"
+                        >
+                          <History className="h-3.5 w-3.5 mr-1" />
+                          <span>Details</span>
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -305,6 +346,192 @@ export default function InvoicesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Invoice Details, Payments Voiding & Audit Dialog */}
+      <Dialog open={!!detailsModalInvoice} onOpenChange={(open) => !open && setDetailsModalInvoice(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Invoice {detailsModalInvoice?.number} Details</span>
+              {detailsModalInvoice && <StatusBadge status={detailsModalInvoice.status} />}
+            </DialogTitle>
+            <DialogDescription>
+              Customer: {detailsModalInvoice?.customer?.name} • Due: {detailsModalInvoice ? formatDate(detailsModalInvoice.due_date) : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailsModalInvoice && (
+            <div className="space-y-5 py-2 text-xs">
+              {/* Financial summary banner */}
+              <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-secondary/60 border border-border">
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Invoice Total</span>
+                  <span className="font-mono font-bold text-sm text-foreground">{formatKES(detailsModalInvoice.amount)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Valid Paid</span>
+                  <span className="font-mono font-bold text-sm text-success">{formatKES(detailsModalInvoice.total_paid)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Balance Due</span>
+                  <span className="font-mono font-bold text-sm text-destructive">{formatKES(detailsModalInvoice.balance_due)}</span>
+                </div>
+              </div>
+
+              {/* Payments Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    Payment Entries
+                  </span>
+                  {detailsModalInvoice.balance_due > 0 && (
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        const inv = detailsModalInvoice;
+                        setDetailsModalInvoice(null);
+                        openPaymentModal(inv);
+                      }}
+                    >
+                      Record Payment
+                    </Button>
+                  )}
+                </div>
+
+                {!detailsModalInvoice.payments || detailsModalInvoice.payments.length === 0 ? (
+                  <p className="text-muted-foreground p-3 text-center bg-secondary/30 rounded-lg">
+                    No payment records entered yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary/60 text-muted-foreground border-b border-border">
+                        <tr>
+                          <th className="py-2 px-3 text-left">Date</th>
+                          <th className="py-2 px-3 text-left">Method / Ref</th>
+                          <th className="py-2 px-3 text-right">Amount</th>
+                          <th className="py-2 px-3 text-center">Status</th>
+                          <th className="py-2 px-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {detailsModalInvoice.payments.map((p) => {
+                          const isVoided = p.status === 'voided';
+                          return (
+                            <tr key={p.id} className={isVoided ? 'bg-destructive/5 text-muted-foreground' : ''}>
+                              <td className="py-2.5 px-3 font-mono">{formatDateTime(p.paid_at)}</td>
+                              <td className="py-2.5 px-3">
+                                <span className="uppercase font-medium">{p.method}</span>
+                                {p.reference && <span className="block font-mono text-[10px] text-muted-foreground">{p.reference}</span>}
+                              </td>
+                              <td className={`py-2.5 px-3 text-right font-mono font-semibold ${isVoided ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                {formatKES(p.amount)}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                {isVoided ? (
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-destructive/10 text-destructive border border-destructive/20" title={p.void_reason ?? 'Voided'}>
+                                    Voided
+                                  </span>
+                                ) : (
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success/10 text-success border border-success/20">
+                                    Valid
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                {!isVoided && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/10"
+                                    onClick={() => setVoidingPayment(p)}
+                                    title="Void payment (financial integrity)"
+                                  >
+                                    <Ban className="h-3 w-3 mr-1" />
+                                    Void
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Credit Notes Section (if any) */}
+              {detailsModalInvoice.credit_notes && detailsModalInvoice.credit_notes.length > 0 && (
+                <div className="space-y-2">
+                  <span className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                    <FileBadge className="h-4 w-4 text-amber-500" />
+                    Credit Notes Issued
+                  </span>
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary/60 text-muted-foreground border-b border-border">
+                        <tr>
+                          <th className="py-2 px-3 text-left">CN Number</th>
+                          <th className="py-2 px-3 text-left">Date</th>
+                          <th className="py-2 px-3 text-left">Reason</th>
+                          <th className="py-2 px-3 text-right">Amount Credited</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {detailsModalInvoice.credit_notes.map((cn) => (
+                          <tr key={cn.id}>
+                            <td className="py-2.5 px-3 font-mono font-semibold text-primary">{cn.number}</td>
+                            <td className="py-2.5 px-3">{cn.created_at?.slice(0, 10)}</td>
+                            <td className="py-2.5 px-3 text-muted-foreground">{cn.reason}</td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600">
+                              - {formatKES(cn.amount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Audit Trail */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <span className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                  <History className="h-4 w-4 text-primary" />
+                  Invoice Audit Trail
+                </span>
+                <HistoryTimeline auditableType="invoice" auditableId={detailsModalInvoice.id} />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailsModalInvoice(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credit Note Dialog */}
+      <CreditNoteDialog
+        invoice={creditNoteInvoice}
+        open={!!creditNoteInvoice}
+        onOpenChange={(open) => !open && setCreditNoteInvoice(null)}
+      />
+
+      {/* Void Payment Dialog */}
+      <VoidPaymentDialog
+        payment={voidingPayment}
+        open={!!voidingPayment}
+        onOpenChange={(open) => !open && setVoidingPayment(null)}
+        onSuccess={() => {
+          setDetailsModalInvoice(null);
+        }}
+      />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { MoneyText } from '@/components/shared/MoneyText';
+import { HistoryTimeline } from '@/components/shared/HistoryTimeline';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -104,11 +105,12 @@ export default function DriverDetailPage() {
         </Card>
       </div>
 
-      {/* Tabs: Trips & Advances */}
+      {/* Tabs: Trips, Advances & History */}
       <Tabs defaultValue="trips" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-xs h-10">
+        <TabsList className="grid w-full grid-cols-3 max-w-md h-10">
           <TabsTrigger value="trips">Trips Made ({driver.trips?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="advances">Advances Trail ({driver.advances?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="advances">Advances ({driver.advances?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         {/* Trips Made Tab */}
@@ -230,6 +232,19 @@ export default function DriverDetailPage() {
                 </table>
               </div>
             </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 3: History & Audit Timeline */}
+        <TabsContent value="history" className="mt-4">
+          <Card className="p-4">
+            <CardHeader className="px-0 pt-0 pb-3">
+              <CardTitle className="text-base">Driver Profile & Licence Audit Trail</CardTitle>
+              <CardDescription>
+                Changes to phone, status, and compliance licence details.
+              </CardDescription>
+            </CardHeader>
+            <HistoryTimeline auditableType="driver" auditableId={driver.id} />
           </Card>
         </TabsContent>
       </Tabs>

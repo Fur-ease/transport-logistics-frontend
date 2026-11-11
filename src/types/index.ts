@@ -33,6 +33,7 @@ export interface Truck {
   capacity_tons: number;
   odometer_km: number;
   status: TruckStatus;
+  version?: number;
   total_trips?: number;
   completed_trips?: number;
   created_at?: string;
@@ -53,6 +54,7 @@ export interface Driver {
   licence_no: string;
   licence_expiry: string;
   status: DriverStatus;
+  version?: number;
   total_trips?: number;
   completed_trips?: number;
   user?: User;
@@ -68,6 +70,7 @@ export interface Customer {
   phone: string;
   email?: string | null;
   payment_terms_days: number;
+  version?: number;
   total_trips?: number;
   total_invoiced?: number;
   total_paid?: number;
@@ -106,6 +109,9 @@ export interface Trip {
   end_odometer?: number | null;
   total_distance_km: number;
   status: TripStatus;
+  version?: number;
+  is_rate_locked?: boolean;
+  has_active_unlock?: boolean;
   notes?: string | null;
   approved_expenses_total: number;
   contribution: number;
@@ -155,12 +161,25 @@ export interface TripExpense {
   entered_by_name?: string;
   status: ExpenseStatus;
   rejection_reason?: string | null;
+  version?: number;
   incurred_at: string;
   created_at?: string;
   fuel_analysis?: FuelAnalysis;
 }
 
 export type AdvanceStatus = 'open' | 'settled';
+
+export interface AdvanceAdjustment {
+  id: number;
+  organization_id: number;
+  driver_advance_id: number;
+  amount: number;
+  type: 'additional_advance' | 'reversal_credit';
+  reason: string;
+  created_by?: number;
+  creator?: { id: number; name: string };
+  created_at?: string;
+}
 
 export interface DriverAdvance {
   id: number;
@@ -170,16 +189,33 @@ export interface DriverAdvance {
   driver_id: number;
   driver_name?: string;
   amount_given: number;
+  total_adjustments?: number;
+  adjusted_amount_given?: number;
   expenses_accepted: number;
   amount_returned: number;
   balance_remaining: number;
   status: AdvanceStatus;
+  is_locked?: boolean;
+  version?: number;
   settled_at?: string | null;
   notes?: string | null;
   created_at?: string;
+  adjustments?: AdvanceAdjustment[];
 }
 
 export type InvoiceStatus = 'unpaid' | 'part_paid' | 'paid' | 'overdue';
+
+export interface CreditNote {
+  id: number;
+  organization_id: number;
+  invoice_id: number;
+  number: string;
+  amount: number;
+  reason: string;
+  issued_by?: number;
+  status: 'applied' | 'voided';
+  created_at?: string;
+}
 
 export interface Invoice {
   id: number;
@@ -193,12 +229,16 @@ export interface Invoice {
   number: string;
   amount: number;
   total_paid: number;
+  total_credited?: number;
   balance_due: number;
+  is_amount_locked?: boolean;
+  version?: number;
   due_date: string;
   status: InvoiceStatus;
   notes?: string | null;
   created_at?: string;
   payments?: Payment[];
+  credit_notes?: CreditNote[];
 }
 
 export interface Payment {
@@ -208,6 +248,10 @@ export interface Payment {
   amount: number;
   method: 'cash' | 'mpesa' | 'bank';
   reference?: string | null;
+  status?: 'valid' | 'voided';
+  void_reason?: string | null;
+  voided_at?: string | null;
+  voided_by_name?: string | null;
   paid_at: string;
   created_at?: string;
 }
