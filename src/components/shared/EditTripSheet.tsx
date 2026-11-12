@@ -17,6 +17,8 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { syncFinancialState } from '@/lib/liveSync';
+import { buildTruckOptions } from '@/lib/truckAvailability';
 import { Trip, Truck, Driver, Customer } from '@/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { formatKES } from '@/lib/formatters';
@@ -33,6 +35,7 @@ const tripEditSchema = z.object({
   start_odometer: z.number().min(0, 'Start odometer must be >= 0'),
   end_odometer: z.number().optional().nullable(),
   truck_id: z.number().min(1, 'Select a truck'),
+  trailer_id: z.number().nullable().optional(),
   driver_id: z.number().min(1, 'Select a driver'),
   customer_id: z.number().min(1, 'Select a customer'),
   notes: z.string().optional().nullable(),
@@ -44,6 +47,7 @@ type TripEditFormData = z.infer<typeof tripEditSchema>;
 interface EditTripSheetProps {
   trip: Trip;
   trucks: Truck[];
+  activeTrips?: Trip[];
   drivers: Driver[];
   customers: Customer[];
   open: boolean;
@@ -54,6 +58,7 @@ interface EditTripSheetProps {
 export function EditTripSheet({
   trip,
   trucks,
+  activeTrips = [],
   drivers,
   customers,
   open,
@@ -79,6 +84,7 @@ export function EditTripSheet({
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<TripEditFormData>({
     resolver: zodResolver(tripEditSchema),
@@ -93,6 +99,7 @@ export function EditTripSheet({
       start_odometer: trip.start_odometer,
       end_odometer: trip.end_odometer ?? null,
       truck_id: trip.truck_id,
+      trailer_id: trip.trailer_id ?? null,
       driver_id: trip.driver_id,
       customer_id: trip.customer_id,
       notes: trip.notes || '',
@@ -101,6 +108,24 @@ export function EditTripSheet({
   });
 
   const watchedValues = watch();
+  const watchedTruckId = watchedValues.truck_id;
+  const truckOptions = buildTruckOptions(
+    trucks,
+    activeTrips,
+    watchedValues.start_date,
+    watchedValues.end_date,
+    trip.truck_id
+  );
+  const selectedTruckOption = truckOptions.find(
+    (option) => option.truck.id === Number(watchedTruckId)
+  );
+
+  React.useEffect(() => {
+    if (Number(watchedTruckId) === trip.truck_id) return;
+    const selected = trucks.find((t) => t.id === Number(watchedTruckId));
+    if (!selected) return;
+    setValue('trailer_id', selected.current_assignment?.trailer_id ?? null);
+  }, [watchedTruckId, trucks, setValue, trip.truck_id]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: TripEditFormData) => {
@@ -111,10 +136,7 @@ export function EditTripSheet({
     },
     onSuccess: () => {
       toast.success(`Trip ${trip.reference} updated successfully`);
-      queryClient.invalidateQueries({ queryKey: ['trip', trip.id] });
-      queryClient.invalidateQueries({ queryKey: ['trips'] });
-      queryClient.invalidateQueries({ queryKey: ['trucks'] });
-      queryClient.invalidateQueries({ queryKey: ['audit-logs', 'trip', trip.id] });
+      syncFinancialState(queryClient);
       onOpenChange(false);
       onSuccess?.();
     },
@@ -140,7 +162,7 @@ export function EditTripSheet({
     },
     onSuccess: (data: any) => {
       toast.success(data?.message || 'Trip unlocked for editing');
-      queryClient.invalidateQueries({ queryKey: ['trip', trip.id] });
+      syncFinancialState(queryClient);
       setShowUnlockModal(false);
     },
     onError: (err: any) => {
@@ -243,13 +265,34 @@ export function EditTripSheet({
                   {...register('truck_id', { valueAsNumber: true })}
                   className="w-full h-10 px-3 text-sm rounded-lg border border-input bg-card text-foreground"
                 >
-                  {trucks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.reg_number} - {t.make} {t.model} ({t.status})
+                  {truckOptions.map(({ truck: t, disabled, reason, note }) => (
+                    <option key={t.id} value={t.id} disabled={disabled}>
+                      {t.reg_number} - {t.make} {t.model}
+                      {disabled ? ` (${reason})` : note ? ` (${note})` : ` (${t.status})`}
                     </option>
                   ))}
                 </select>
                 {errors.truck_id && <p className="text-[11px] text-destructive mt-1">{errors.truck_id.message}</p>}
+                {selectedTruckOption?.disabled && (
+                  <p className="text-[11px] text-destructive mt-1">
+                    {selectedTruckOption.reason}. Pick another truck or adjust the dates.
+                  </p>
+                )}
+                {(() => {
+                  const selected = trucks.find((t) => t.id === Number(watchedTruckId));
+                  if (!selected) return null;
+                  const trailer =
+                    Number(watchedTruckId) === trip.truck_id
+                      ? trip.trailer
+                      : selected.current_assignment?.trailer;
+                  return (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {trailer
+                        ? `Trip trailer: ${trailer.reg_number}`
+                        : 'This head has no coupled trailer; trip will be head-only.'}
+                    </p>
+                  );
+                })()}
               </div>
 
               <div>

@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/Dialog';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
+import { LIVE_REFETCH_MS, syncFinancialState } from '@/lib/liveSync';
 import { formatKES, formatDate, formatDateTime } from '@/lib/formatters';
 import { Invoice, Payment } from '@/types';
 
@@ -68,6 +69,7 @@ export default function InvoicesPage() {
   const { data, isLoading } = useQuery<{ data: Invoice[] }>({
     queryKey: ['invoices', statusFilter, search],
     queryFn: () => api.get<{ data: Invoice[] }>('/invoices', { status: statusFilter, search }),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   const invoices = data?.data || [];
@@ -90,9 +92,7 @@ export default function InvoicesPage() {
     mutationFn: (payData: PaymentFormData) =>
       api.post(`/invoices/${selectedInvoice?.id}/payments`, payData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['trips'] });
+      syncFinancialState(queryClient);
       toast.success('Payment registered successfully');
       setPaymentModalOpen(false);
       setSelectedInvoice(null);

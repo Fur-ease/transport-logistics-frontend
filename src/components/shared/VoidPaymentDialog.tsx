@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { syncFinancialState } from '@/lib/liveSync';
 import { Payment } from '@/types';
 import { formatKES, formatDateTime } from '@/lib/formatters';
 
@@ -41,8 +42,7 @@ export function VoidPaymentDialog({
     },
     onSuccess: (res: any) => {
       toast.success(res?.message || 'Payment voided successfully');
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      syncFinancialState(queryClient);
       onOpenChange(false);
       setReason('');
       onSuccess?.();

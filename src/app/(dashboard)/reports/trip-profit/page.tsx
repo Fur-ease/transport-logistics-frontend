@@ -34,6 +34,7 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ExportConfirmModal } from '@/components/shared/ExportConfirmModal';
 import { api } from '@/lib/api';
+import { LIVE_REFETCH_MS } from '@/lib/liveSync';
 import { formatKES, formatNumber, formatDate, formatKm } from '@/lib/formatters';
 import {
   TripProfitReport,
@@ -171,6 +172,7 @@ export default function TripProfitSheetPage() {
   } = useQuery<{ data: TripProfitReport }>({
     queryKey: ['trip-profit-report', apiQueryString],
     queryFn: () => api.get(`/reports/trip-profit?${apiQueryString}`),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   const report = reportResponse?.data;

@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { syncFinancialState } from '@/lib/liveSync';
 import { Invoice } from '@/types';
 import { formatKES } from '@/lib/formatters';
 
@@ -45,8 +46,7 @@ export function CreditNoteDialog({
     },
     onSuccess: (res: any) => {
       toast.success(res?.message || 'Credit note issued successfully');
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      syncFinancialState(queryClient);
       onOpenChange(false);
       setAmount('');
       setReason('');

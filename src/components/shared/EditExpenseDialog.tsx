@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { syncFinancialState } from '@/lib/liveSync';
 import { TripExpense } from '@/types';
 import { ConcurrencyModal } from './ConcurrencyModal';
 
@@ -106,12 +107,7 @@ export function EditExpenseDialog({
     },
     onSuccess: (res: any) => {
       toast.success(res?.message || 'Expense updated successfully');
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      if (expense) {
-        queryClient.invalidateQueries({ queryKey: ['trip', expense.trip_id] });
-        queryClient.invalidateQueries({ queryKey: ['audit-logs', 'expense', expense.id] });
-      }
-      queryClient.invalidateQueries({ queryKey: ['advances'] });
+      syncFinancialState(queryClient);
       onOpenChange(false);
       onSuccess?.();
     },
@@ -262,7 +258,7 @@ export function EditExpenseDialog({
         serverVersion={concurrencyError.currentVersion}
         conflictFields={concurrencyError.conflictFields}
         onRefresh={() => {
-          queryClient.invalidateQueries({ queryKey: ['expenses'] });
+          syncFinancialState(queryClient);
           onOpenChange(false);
         }}
       />

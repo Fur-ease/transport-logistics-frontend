@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { syncFinancialState } from '@/lib/liveSync';
 import { DriverAdvance } from '@/types';
 import { formatKES } from '@/lib/formatters';
 
@@ -47,8 +48,7 @@ export function AdvanceAdjustmentDialog({
     },
     onSuccess: (res: any) => {
       toast.success(res?.message || 'Advance adjustment registered successfully');
-      queryClient.invalidateQueries({ queryKey: ['advances'] });
-      queryClient.invalidateQueries({ queryKey: ['trip', advance?.trip_id] });
+      syncFinancialState(queryClient);
       onOpenChange(false);
       setAmount('');
       setReason('');

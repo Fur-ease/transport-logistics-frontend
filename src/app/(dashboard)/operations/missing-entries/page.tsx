@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api, getAuthToken } from '@/lib/api';
+import { syncFinancialState } from '@/lib/liveSync';
 import { formatDate } from '@/lib/formatters';
 import {
   DataIssue,
@@ -157,8 +158,7 @@ export default function MissingEntriesPage() {
     mutationFn: () => api.post('/missing-entries/scan', {}),
     onSuccess: (data: unknown) => {
       toast.success('Fleet data quality scan completed.');
-      queryClient.invalidateQueries({ queryKey: ['missing-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      syncFinancialState(queryClient);
     },
     onError: (err: unknown) => {
       toast.error('Failed to trigger scan.');
@@ -181,7 +181,7 @@ export default function MissingEntriesPage() {
       toast.success('Data issue dismissed. It will not reappear unless data changes.');
       setDismissTarget(null);
       setDismissReason('');
-      queryClient.invalidateQueries({ queryKey: ['missing-entries'] });
+      syncFinancialState(queryClient);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to dismiss issue.';
       toast.error(msg);
@@ -197,7 +197,7 @@ export default function MissingEntriesPage() {
         assigned_to: userId,
       });
       toast.success('Assigned staff updated.');
-      queryClient.invalidateQueries({ queryKey: ['missing-entries'] });
+      syncFinancialState(queryClient);
     } catch (err: unknown) {
       toast.error('Failed to assign staff.');
     }

@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
+import { LIVE_REFETCH_MS } from '@/lib/liveSync';
 import { formatKES, formatKm, formatDate } from '@/lib/formatters';
 import { TripsPerTruckReport } from '@/types';
 
@@ -39,6 +40,7 @@ export default function ReportsPage() {
   const { data: tripsPerTruckData, isLoading: isTptLoading } = useQuery<{ data: TripsPerTruckReport }>({
     queryKey: ['report-trips-per-truck', dateFrom, dateTo],
     queryFn: () => api.get<{ data: TripsPerTruckReport }>('/reports/trips-per-truck', { from: dateFrom, to: dateTo }),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   // 2. Profitability query
@@ -65,6 +67,7 @@ export default function ReportsPage() {
   }>({
     queryKey: ['report-profitability', dateFrom, dateTo],
     queryFn: () => api.get('/reports/profitability', { from: dateFrom, to: dateTo }),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   // 3. Fuel Efficiency query
@@ -95,6 +98,7 @@ export default function ReportsPage() {
   }>({
     queryKey: ['report-fuel-efficiency', dateFrom, dateTo],
     queryFn: () => api.get('/reports/fuel-efficiency', { from: dateFrom, to: dateTo }),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   // 4. Customer Ageing query
@@ -121,6 +125,7 @@ export default function ReportsPage() {
   }>({
     queryKey: ['report-customer-aging'],
     queryFn: () => api.get('/reports/customer-aging'),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   const exportCsv = (type: string) => {

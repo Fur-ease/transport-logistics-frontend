@@ -14,6 +14,7 @@ import {
   Calendar,
   Layers,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import {
   BarChart,
@@ -35,6 +36,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
 import { formatKES, formatNumber, formatDate } from '@/lib/formatters';
 import { DashboardStats } from '@/types';
+import { LIVE_REFETCH_MS } from '@/lib/liveSync';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 export default function DashboardPage() {
@@ -46,10 +48,11 @@ export default function DashboardPage() {
   }>({
     queryKey: ['missing-entries-summary'],
     queryFn: () => api.get('/missing-entries?per_page=1'),
+    refetchInterval: 30000,
   });
   const missingSummary = missingResponse?.summary;
 
-  const { data: stats, isLoading } = useQuery<DashboardStats>({
+  const { data: stats, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', range],
     queryFn: () => {
       let from = '';
@@ -69,6 +72,7 @@ export default function DashboardPage() {
 
       return api.get<DashboardStats>('/dashboard/stats', { from, to });
     },
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   const chartData = stats?.trips_per_truck?.trucks?.map((t) => ({
@@ -123,6 +127,27 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+          </span>
+          Live financials · auto-refresh every 15s
+          {dataUpdatedAt ? ` · updated ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => refetch()}
+          className="h-7 px-2 text-[11px]"
+          disabled={isFetching}
+        >
+          <RefreshCw className={`mr-1 h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
 
       {/* KPI Stat Cards Grid */}
       {isLoading ? (

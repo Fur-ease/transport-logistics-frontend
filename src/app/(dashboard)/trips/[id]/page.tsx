@@ -59,21 +59,16 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
 import { formatKES, formatKm, formatDate, formatDateTime } from '@/lib/formatters';
+import { LIVE_REFETCH_MS, syncFinancialState } from '@/lib/liveSync';
 import { Trip, TripExpense, DriverAdvance, Truck, Driver, Customer } from '@/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 const expenseSchema = z.object({
-  category: z.enum([
-    'fuel',
-    'allowance',
-    'toll',
-    'county_levy_cess',
-    'border_fees',
-    'loading_offloading',
-    'repairs',
-    'other',
-  ]),
-  amount: z.number().min(1, 'Amount in KES is required'),
+  category: z.enum(
+    ['fuel', 'allowance', 'toll', 'county_levy_cess', 'border_fees', 'loading_offloading', 'repairs', 'other'],
+    { message: 'Expense category is required' }
+  ),
+  amount: z.number({ error: 'Amount in KES is required' }).min(1, 'Amount in KES is required'),
   litres: z.number().optional().nullable(),
   odometer_at_fill: z.number().optional().nullable(),
   incurred_at: z.string().min(1, 'Date and time required'),
@@ -105,18 +100,18 @@ export default function TripDetailPage() {
   const { user } = useAuth();
 
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<File | null>(null);
+  const [selectedReceipts, setSelectedReceipts] = useState<File[]>([]);
 
   const openAddExpenseModal = () => {
     resetExpenseForm({
-      category: 'fuel',
-      incurred_at: new Date().toISOString().slice(0, 16),
-      amount: 5000,
+      category: undefined as unknown as ExpenseFormData['category'],
+      amount: undefined as unknown as number,
+      incurred_at: '',
       litres: undefined,
       odometer_at_fill: undefined,
       notes: '',
     });
-    setSelectedReceipt(null);
+    setSelectedReceipts([]);
     setAddExpenseOpen(true);
   };
 
@@ -142,15 +137,26 @@ export default function TripDetailPage() {
   const [activeBottomTab, setActiveBottomTab] = useState<'expenses' | 'history'>('expenses');
 
   // Fetch Trip details
-  const { data: tripData, isLoading: isTripLoading } = useQuery<{ data: Trip }>({
+  const {
+    data: tripData,
+    isLoading: isTripLoading,
+    isFetching: isTripFetching,
+    refetch: refetchTrip,
+    dataUpdatedAt: tripUpdatedAt,
+  } = useQuery<{ data: Trip }>({
     queryKey: ['trip', tripId],
     queryFn: () => api.get<{ data: Trip }>(`/trips/${tripId}`),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   // Fetch fleet options for edit sheet
   const { data: trucksData } = useQuery<{ data: Truck[] }>({
     queryKey: ['trucks-select'],
-    queryFn: () => api.get<{ data: Truck[] }>('/trucks'),
+    queryFn: () => api.get<{ data: Truck[] }>('/trucks', { per_page: 100 }),
+  });
+  const { data: activeTripsData } = useQuery<{ data: Trip[] }>({
+    queryKey: ['active-trips-select'],
+    queryFn: () => api.get<{ data: Trip[] }>('/trips', { status: 'active', per_page: 100 }),
   });
   const { data: driversData } = useQuery<{ data: Driver[] }>({
     queryKey: ['drivers-select'],
@@ -162,9 +168,10 @@ export default function TripDetailPage() {
   });
 
   // Fetch Trip P&L
-  const { data: pnlData, isLoading: isPnlLoading } = useQuery<{ data: TripPnLResponse }>({
+  const { data: pnlData, isLoading: isPnlLoading, refetch: refetchPnl } = useQuery<{ data: TripPnLResponse }>({
     queryKey: ['trip-pnl', tripId],
     queryFn: () => api.get<{ data: TripPnLResponse }>(`/trips/${tripId}/pnl`),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   // Advancement C: Missing entries query for this trip
@@ -193,9 +200,10 @@ export default function TripDetailPage() {
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      category: 'fuel',
-      incurred_at: new Date().toISOString().slice(0, 16),
-      amount: 10000,
+      category: undefined as unknown as ExpenseFormData['category'],
+      amount: undefined as unknown as number,
+      incurred_at: '',
+      notes: '',
     },
   });
 
@@ -215,27 +223,23 @@ export default function TripDetailPage() {
       }
       data.append('incurred_at', formData.incurred_at);
       if (formData.notes) data.append('notes', formData.notes);
-      if (selectedReceipt) data.append('receipt', selectedReceipt);
+      selectedReceipts.forEach((file) => data.append('receipts[]', file));
 
       return api.upload(`/trips/${tripId}/expenses`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['missing-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['trip-issues', tripId] });
+      syncFinancialState(queryClient);
       toast.success('Expense recorded successfully');
       setAddExpenseOpen(false);
       resetExpenseForm({
-        category: 'fuel',
-        incurred_at: new Date().toISOString().slice(0, 16),
-        amount: 5000,
+        category: undefined as unknown as ExpenseFormData['category'],
+        amount: undefined as unknown as number,
+        incurred_at: '',
         litres: undefined,
         odometer_at_fill: undefined,
         notes: '',
       });
-      setSelectedReceipt(null);
+      setSelectedReceipts([]);
     },
     onError: (err: Error) => {
       toast.error(err.message || 'Failed to submit expense');
@@ -247,8 +251,7 @@ export default function TripDetailPage() {
     mutationFn: ({ expenseId, status, reason }: { expenseId: number; status: string; reason?: string }) =>
       api.patch(`/expenses/${expenseId}/status`, { status, rejection_reason: reason }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
+      syncFinancialState(queryClient);
       toast.success('Expense status updated');
     },
   });
@@ -258,8 +261,7 @@ export default function TripDetailPage() {
     mutationFn: ({ expenseId, targetTripId, reason }: { expenseId: number; targetTripId: number; reason: string }) =>
       api.post(`/expenses/${expenseId}/reassign`, { target_trip_id: targetTripId, reason }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
+      syncFinancialState(queryClient);
       toast.success('Expense reassigned and logged in audit trail');
       setReassignModalOpen(false);
       setExpenseToReassign(null);
@@ -275,10 +277,7 @@ export default function TripDetailPage() {
     mutationFn: (updates: { status: string; end_odometer?: number; end_date?: string }) =>
       api.put(`/trips/${tripId}`, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trips'] });
-      queryClient.invalidateQueries({ queryKey: ['trucks'] });
+      syncFinancialState(queryClient);
       toast.success('Trip status updated');
       setDeliveredModalOpen(false);
     },
@@ -292,7 +291,7 @@ export default function TripDetailPage() {
     mutationFn: ({ advanceId, returned }: { advanceId: number; returned: number }) =>
       api.post(`/advances/${advanceId}/settle`, { amount_returned: returned }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+      syncFinancialState(queryClient);
       toast.success('Driver advance settlement updated');
       setSettleModalOpen(false);
       setSelectedAdvance(null);
@@ -307,7 +306,7 @@ export default function TripDetailPage() {
   const createInvoiceMutation = useMutation({
     mutationFn: () => api.post('/invoices', { trip_id: Number(tripId) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+      syncFinancialState(queryClient);
       toast.success('Invoice generated for customer');
     },
     onError: (err: Error) => {
@@ -398,6 +397,30 @@ export default function TripDetailPage() {
         }
       />
 
+      <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+          </span>
+          Live trip P&L · auto-refresh every 15s
+          {tripUpdatedAt ? ` · updated ${new Date(tripUpdatedAt).toLocaleTimeString()}` : ''}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            refetchTrip();
+            refetchPnl();
+          }}
+          className="h-7 px-2 text-[11px]"
+          disabled={isTripFetching}
+        >
+          <RefreshCw className={`mr-1 h-3 w-3 ${isTripFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* Advancement C: Missing entries warning banner */}
       {tripIssues.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs">
@@ -439,6 +462,11 @@ export default function TripDetailPage() {
                     {trip.truck?.reg_number}
                   </Link>
                   <p className="text-muted-foreground mt-0.5">{trip.truck?.make} {trip.truck?.model}</p>
+                  {trip.trailer && (
+                    <p className="font-mono text-[11px] text-muted-foreground mt-1">
+                      Trailer {trip.trailer.reg_number}
+                    </p>
+                  )}
                 </div>
 
                 <div className="p-3 rounded-lg bg-secondary/50 border border-border">
@@ -818,8 +846,10 @@ export default function TripDetailPage() {
               <label className="text-xs font-semibold text-foreground block mb-1">Expense Category</label>
               <select
                 {...register('category')}
+                defaultValue=""
                 className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary capitalize"
               >
+                <option value="">-- Select category --</option>
                 <option value="fuel">Fuel (Diesel Refill)</option>
                 <option value="allowance">Driver Allowance (Per Diem)</option>
                 <option value="toll">Toll &amp; Weighing Cess</option>
@@ -836,9 +866,9 @@ export default function TripDetailPage() {
               <Input
                 type="number"
                 step="10"
-                placeholder="e.g. 5000"
+                placeholder="Enter amount"
                 {...register('amount', {
-                  setValueAs: (v) => (v === '' || v === undefined ? 0 : Number(v)),
+                  setValueAs: (v) => (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? undefined : Number(v)),
                 })}
               />
               {expenseErrors.amount && (
@@ -881,14 +911,14 @@ export default function TripDetailPage() {
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Date &amp; Time Incurred</label>
-              <Input type="datetime-local" {...register('incurred_at')} />
+              <Input type="datetime-local" {...register('incurred_at')} placeholder="" />
               {expenseErrors.incurred_at && (
                 <p className="text-[11px] text-destructive mt-1">{expenseErrors.incurred_at.message}</p>
               )}
             </div>
 
-            {/* Receipt Upload with Camera Capture */}
-            <FileUpload onFileSelect={(file) => setSelectedReceipt(file)} />
+            {/* Receipt/Document Uploads */}
+            <FileUpload onFilesSelect={setSelectedReceipts} label="Attach Receipts or Documents (multiple allowed)" />
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Notes / Receipt Number</label>
@@ -1091,6 +1121,7 @@ export default function TripDetailPage() {
       <EditTripSheet
         trip={trip}
         trucks={trucksData?.data ?? []}
+        activeTrips={activeTripsData?.data ?? []}
         drivers={driversData?.data ?? []}
         customers={customersData?.data ?? []}
         open={editTripSheetOpen}

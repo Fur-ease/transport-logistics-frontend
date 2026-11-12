@@ -22,6 +22,49 @@ export interface Organization {
 
 export type TruckStatus = 'available' | 'on_trip' | 'maintenance' | 'inactive';
 
+export type TrailerStatus = 'available' | 'in_use' | 'maintenance' | 'inactive';
+
+export interface Trailer {
+  id: number;
+  organization_id: number;
+  reg_number: string;
+  type: string;
+  make?: string | null;
+  model?: string | null;
+  year?: number | null;
+  capacity_tons: number;
+  tare_weight_tons?: number | null;
+  status: TrailerStatus;
+  version?: number;
+  trips_count?: number;
+  active_assignment?: TruckTrailerAssignment | null;
+  assignments?: TruckTrailerAssignment[];
+  trips?: Trip[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TruckTrailerAssignment {
+  id: number;
+  organization_id: number;
+  truck_id: number;
+  trailer_id: number;
+  truck?: Truck;
+  trailer?: Trailer;
+  coupled_at: string;
+  uncoupled_at?: string | null;
+  odometer_at_couple?: number | null;
+  odometer_at_uncouple?: number | null;
+  coupled_by?: number | null;
+  uncoupled_by?: number | null;
+  coupled_by_user?: Pick<User, 'id' | 'name'> | null;
+  uncoupled_by_user?: Pick<User, 'id' | 'name'> | null;
+  couple_notes?: string | null;
+  uncouple_reason?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Truck {
   id: number;
   organization_id: number;
@@ -36,8 +79,11 @@ export interface Truck {
   version?: number;
   total_trips?: number;
   completed_trips?: number;
+  trips_count?: number;
   created_at?: string;
   updated_at?: string;
+  current_assignment?: TruckTrailerAssignment | null;
+  trailer_assignments?: TruckTrailerAssignment[];
   trips?: Trip[];
   maintenance_records?: MaintenanceRecord[];
   compliance_documents?: ComplianceDocument[];
@@ -94,6 +140,8 @@ export interface Trip {
   reference: string;
   truck_id: number;
   truck?: Truck;
+  trailer_id?: number | null;
+  trailer?: Trailer | null;
   driver_id: number;
   driver?: Driver;
   customer_id: number;

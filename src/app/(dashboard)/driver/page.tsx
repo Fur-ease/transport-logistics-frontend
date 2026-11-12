@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
+import { LIVE_REFETCH_MS, syncFinancialState } from '@/lib/liveSync';
 import { formatKES, formatKm, formatDate } from '@/lib/formatters';
 import { Trip, DriverAdvance, TripExpense } from '@/types';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -64,18 +65,20 @@ export default function DriverMobileViewPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<File | null>(null);
+  const [selectedReceipts, setSelectedReceipts] = useState<File[]>([]);
 
   // Fetch driver's trips
   const { data: tripsData, isLoading } = useQuery<{ data: Trip[] }>({
     queryKey: ['my-driver-trips'],
     queryFn: () => api.get<{ data: Trip[] }>('/trips'),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   // Fetch advances
   const { data: advancesData } = useQuery<{ data: DriverAdvance[] }>({
     queryKey: ['my-advances'],
     queryFn: () => api.get<{ data: DriverAdvance[] }>('/advances'),
+    refetchInterval: LIVE_REFETCH_MS,
   });
 
   const trips = tripsData?.data || [];
@@ -111,17 +114,16 @@ export default function DriverMobileViewPage() {
       if (formData.odometer_at_fill) data.append('odometer_at_fill', String(formData.odometer_at_fill));
       data.append('incurred_at', new Date().toISOString());
       if (formData.notes) data.append('notes', formData.notes);
-      if (selectedReceipt) data.append('receipt', selectedReceipt);
+      selectedReceipts.forEach((file) => data.append('receipts[]', file));
 
       return api.upload(`/trips/${formData.trip_id}/expenses`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-driver-trips'] });
-      queryClient.invalidateQueries({ queryKey: ['my-advances'] });
+      syncFinancialState(queryClient);
       toast.success('Expense receipt submitted to dispatch manager');
       setSheetOpen(false);
       reset();
-      setSelectedReceipt(null);
+      setSelectedReceipts([]);
     },
     onError: (err: Error) => {
       toast.error(err.message || 'Failed to submit expense');
@@ -325,9 +327,9 @@ export default function DriverMobileViewPage() {
 
             {/* Receipt Camera Capture (allows direct camera use) */}
             <FileUpload
-              onFileSelect={(file) => setSelectedReceipt(file)}
+              onFilesSelect={setSelectedReceipts}
               allowCamera={true}
-              label="Photograph Receipt (Camera Auto-Focus)"
+              label="Photograph Receipts/Documents (multiple allowed)"
             />
 
             <div>
