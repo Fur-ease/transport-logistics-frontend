@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,22 +17,22 @@ import {
 } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { api } from '@/lib/api';
+import { api, getFileUrl, openProtectedFile } from '@/lib/api';
 import { syncFinancialState } from '@/lib/liveSync';
 import { TripExpense } from '@/types';
+import { CategorySelect, DEFAULT_EXPENSE_CATEGORIES, formatCategoryLabel } from './CategorySelect';
 import { ConcurrencyModal } from './ConcurrencyModal';
 
+function normalizeCategoryValue(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
 const expenseEditSchema = z.object({
-  category: z.enum([
-    'fuel',
-    'allowance',
-    'toll',
-    'county_levy_cess',
-    'border_fees',
-    'loading_offloading',
-    'repairs',
-    'other',
-  ]),
+  category: z
+    .string()
+    .min(1, 'Category is required')
+    .max(50, 'Category is too long')
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _\/&-]*$/, 'Invalid category name'),
   amount: z.number().min(1, 'Amount must be greater than 0'),
   litres: z.number().optional().nullable(),
   odometer_at_fill: z.number().optional().nullable(),
@@ -69,6 +69,7 @@ export function EditExpenseDialog({
     handleSubmit,
     watch,
     reset,
+    control,
     formState: { errors },
   } = useForm<ExpenseEditFormData>({
     resolver: zodResolver(expenseEditSchema),
@@ -83,17 +84,17 @@ export function EditExpenseDialog({
   });
 
   useEffect(() => {
-    if (expense) {
+    if (expense && open) {
       reset({
-        category: expense.category,
+        category: normalizeCategoryValue(expense.category || ''),
         amount: Number(expense.amount),
-        litres: expense.litres ? Number(expense.litres) : null,
-        odometer_at_fill: expense.odometer_at_fill ? Number(expense.odometer_at_fill) : null,
-        incurred_at: expense.incurred_at ? expense.incurred_at.slice(0, 16) : new Date().toISOString().slice(0, 16),
+        litres: expense.litres != null ? Number(expense.litres) : null,
+        odometer_at_fill: expense.odometer_at_fill != null ? Number(expense.odometer_at_fill) : null,
+        incurred_at: expense.incurred_at ? String(expense.incurred_at).slice(0, 16) : new Date().toISOString().slice(0, 16),
         reason: '',
       });
     }
-  }, [expense, reset]);
+  }, [expense, open, reset]);
 
   const selectedCategory = watch('category');
 
@@ -102,6 +103,7 @@ export function EditExpenseDialog({
       if (!expense) return;
       return api.put(`/expenses/${expense.id}`, {
         ...data,
+        incurred_at: data.incurred_at ? new Date(data.incurred_at).toISOString() : data.incurred_at,
         version: expense.version ?? 1,
       });
     },
@@ -169,19 +171,18 @@ export function EditExpenseDialog({
           >
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Category *</label>
-              <select
-                {...register('category')}
-                className="w-full h-10 px-3 text-sm rounded-lg border border-input bg-card text-foreground"
-              >
-                <option value="fuel">Fuel (Diesel)</option>
-                <option value="allowance">Driver Allowance</option>
-                <option value="toll">Highway Toll / Expressway</option>
-                <option value="county_levy_cess">County Levy / Cess</option>
-                <option value="border_fees">Border Clearing Fees</option>
-                <option value="loading_offloading">Loading / Offloading</option>
-                <option value="repairs">Emergency En-Route Repairs</option>
-                <option value="other">Other Incidentals</option>
-              </select>
+              <Controller
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <CategorySelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    suggestions={[expense?.category, ...DEFAULT_EXPENSE_CATEGORIES.map((c) => c.value)].filter(Boolean) as string[]}
+                  />
+                )}
+              />
+              {errors.category && <p className="text-[11px] text-destructive mt-1">{errors.category.message as string}</p>}
             </div>
 
             <div>
@@ -229,6 +230,61 @@ export function EditExpenseDialog({
               <label className="text-xs font-semibold text-foreground block mb-1">Date & Time *</label>
               <Input type="datetime-local" {...register('incurred_at')} />
             </div>
+
+            {(() => {
+              const attachments = ((expense.receipts?.length ? expense.receipts : (expense as any).attachments) || []) as any[];
+              return (expense.notes || expense.receipt_path || attachments.length) && (
+              <div className="p-3 rounded-xl bg-secondary/50 border border-border space-y-1.5 text-xs">
+                {expense.notes && (
+                  <p className="text-muted-foreground whitespace-pre-wrap">
+                    <span className="font-semibold text-foreground">Recorded Notes/Ref:</span> {expense.notes}
+                  </p>
+                )}
+                {(expense.receipt_path || attachments.length) && (
+                  <div className="text-muted-foreground space-y-1">
+                    <span className="font-semibold text-foreground">Receipts/Documents:</span>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                      {attachments.length ? (
+                        attachments.map((r: any, idx: number) => {
+                          const p = typeof r === 'string' ? r : r?.url || r?.path || r?.file_path;
+                          const href = getFileUrl(p);
+                          const label = typeof r === 'string' ? `Receipt ${idx + 1}` : r?.name || r?.original_name || `Receipt ${idx + 1}`;
+                          const openPath = r?.id ? `/expenses/${expense.id}/attachments/${r.id}` : (p || `/expenses/${expense.id}/receipt`);
+                          return href || r?.id ? (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => openProtectedFile(openPath).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                              className="text-primary underline hover:text-primary/80"
+                            >
+                              {label}
+                            </button>
+                          ) : (
+                            <span key={idx}>{label}</span>
+                          );
+                        })
+                      ) : getFileUrl(expense.receipt_path) ? (
+                        <button
+                          type="button"
+                          onClick={() => openProtectedFile(`/expenses/${expense.id}/receipt`).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                          className="text-primary underline hover:text-primary/80"
+                        >
+                          Open receipt
+                        </button>
+                      ) : (
+                        <span>1 attached</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {expense.rejection_reason && (
+                  <p className="text-destructive">
+                    <span className="font-semibold">Rejection reason:</span> {expense.rejection_reason}
+                  </p>
+                )}
+              </div>
+            );
+            })()}
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">

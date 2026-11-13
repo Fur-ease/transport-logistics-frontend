@@ -100,8 +100,9 @@ export function HistoryTimeline({ auditableType, auditableId, title = 'Audit & E
           </p>
         </div>
       ) : (
-        <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-          {logs.map((log) => {
+        <div className="max-h-[480px] overflow-y-auto pr-1">
+          <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
+            {logs.map((log) => {
             const oldVals = log.old_values || {};
             const newVals = log.new_values || {};
             const changedKeys = Object.keys(newVals);
@@ -174,7 +175,8 @@ export function HistoryTimeline({ auditableType, auditableId, title = 'Audit & E
                 </div>
               </div>
             );
-          })}
+            })}
+          </div>
         </div>
       )}
     </div>

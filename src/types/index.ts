@@ -178,7 +178,8 @@ export type ExpenseCategory =
   | 'border_fees'
   | 'loading_offloading'
   | 'repairs'
-  | 'other';
+  | 'other'
+  | (string & {});
 
 export type ExpenseStatus = 'pending' | 'approved' | 'rejected';
 
@@ -205,10 +206,12 @@ export interface TripExpense {
   litres?: number | null;
   odometer_at_fill?: number | null;
   receipt_path?: string | null;
+  receipts?: Array<{ id?: number; path?: string; url?: string; name?: string } | string>;
   entered_by: number;
   entered_by_name?: string;
   status: ExpenseStatus;
   rejection_reason?: string | null;
+  notes?: string | null;
   version?: number;
   incurred_at: string;
   created_at?: string;

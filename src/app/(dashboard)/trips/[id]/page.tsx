@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
@@ -37,6 +37,7 @@ import { EditTripSheet } from '@/components/shared/EditTripSheet';
 import { EditExpenseDialog } from '@/components/shared/EditExpenseDialog';
 import { AdvanceAdjustmentDialog } from '@/components/shared/AdvanceAdjustmentDialog';
 import { HistoryTimeline } from '@/components/shared/HistoryTimeline';
+import { CategorySelect } from '@/components/shared/CategorySelect';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -57,17 +58,18 @@ import {
   SheetFooter,
 } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { api } from '@/lib/api';
+import { api, getFileUrl, openProtectedFile } from '@/lib/api';
 import { formatKES, formatKm, formatDate, formatDateTime } from '@/lib/formatters';
 import { LIVE_REFETCH_MS, syncFinancialState } from '@/lib/liveSync';
 import { Trip, TripExpense, DriverAdvance, Truck, Driver, Customer } from '@/types';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 const expenseSchema = z.object({
-  category: z.enum(
-    ['fuel', 'allowance', 'toll', 'county_levy_cess', 'border_fees', 'loading_offloading', 'repairs', 'other'],
-    { message: 'Expense category is required' }
-  ),
+  category: z
+    .string({ message: 'Expense category is required' })
+    .min(1, 'Expense category is required')
+    .max(50, 'Category is too long')
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _\/&-]*$/, 'Invalid category name'),
   amount: z.number({ error: 'Amount in KES is required' }).min(1, 'Amount in KES is required'),
   litres: z.number().optional().nullable(),
   odometer_at_fill: z.number().optional().nullable(),
@@ -104,7 +106,7 @@ export default function TripDetailPage() {
 
   const openAddExpenseModal = () => {
     resetExpenseForm({
-      category: undefined as unknown as ExpenseFormData['category'],
+      category: '',
       amount: undefined as unknown as number,
       incurred_at: '',
       litres: undefined,
@@ -196,11 +198,13 @@ export default function TripDetailPage() {
     handleSubmit,
     reset: resetExpenseForm,
     watch,
+    control,
+    setValue,
     formState: { errors: expenseErrors },
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      category: undefined as unknown as ExpenseFormData['category'],
+      category: '',
       amount: undefined as unknown as number,
       incurred_at: '',
       notes: '',
@@ -221,7 +225,8 @@ export default function TripDetailPage() {
       if (formData.odometer_at_fill !== undefined && formData.odometer_at_fill !== null && !isNaN(formData.odometer_at_fill)) {
         data.append('odometer_at_fill', String(formData.odometer_at_fill));
       }
-      data.append('incurred_at', formData.incurred_at);
+      // send as ISO instant so stored/displayed time matches the selected local date & time
+      data.append('incurred_at', new Date(formData.incurred_at).toISOString());
       if (formData.notes) data.append('notes', formData.notes);
       selectedReceipts.forEach((file) => data.append('receipts[]', file));
 
@@ -328,16 +333,13 @@ export default function TripDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span>{trip.reference} — {trip.origin} to {trip.destination}</span>
-            {(trip.version ?? 1) > 1 && (
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                Edited v{trip.version}
-              </span>
-            )}
-          </div>
+          <span>{trip.reference} {trip.origin} to {trip.destination}</span>
         }
-        description={`${trip.customer?.name} • Cargo: ${trip.cargo_description} (${trip.cargo_weight_tons} tons) • Rate: ${formatKES(trip.agreed_rate)}`}
+        description={
+          <p className="text-sm md:text-base font-medium text-foreground mt-1 max-w-3xl">
+            {trip.customer?.name} • Cargo: {trip.cargo_description} ({trip.cargo_weight_tons} tons) • Rate: {formatKES(trip.agreed_rate)}
+          </p>
+        }
         breadcrumbs={[
           { label: 'Trips & Dispatch', href: '/trips' },
           { label: trip.reference },
@@ -345,8 +347,9 @@ export default function TripDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
+              className="bg-sky-100 text-sky-800 hover:bg-sky-200 border border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800 dark:hover:bg-sky-900/60"
               onClick={() => setEditTripSheetOpen(true)}
             >
               <Edit3 className="mr-1.5 h-4 w-4" />
@@ -386,7 +389,7 @@ export default function TripDetailPage() {
             )}
 
             <Button
-              variant="outline"
+              variant="success"
               size="sm"
               onClick={openAddExpenseModal}
             >
@@ -403,8 +406,8 @@ export default function TripDetailPage() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          Live trip P&L · auto-refresh every 15s
-          {tripUpdatedAt ? ` · updated ${new Date(tripUpdatedAt).toLocaleTimeString()}` : ''}
+          Live trip P&L Â· auto-refresh every 15s
+          {tripUpdatedAt ? ` Â· updated ${new Date(tripUpdatedAt).toLocaleTimeString()}` : ''}
         </span>
         <Button
           variant="ghost"
@@ -487,8 +490,14 @@ export default function TripDetailPage() {
                     {formatKm(trip.total_distance_km)}
                   </p>
                   <p className="text-muted-foreground mt-0.5 font-mono text-[11px]">
-                    {trip.start_odometer} → {trip.end_odometer ?? '...'}
+                    {trip.start_odometer} to {trip.end_odometer ?? '...'}
                   </p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                  <span className="text-muted-foreground block text-[11px] mb-1">Trip Dates</span>
+                  <p className="font-semibold text-sm text-foreground">Start: {formatDate(trip.start_date)}</p>
+                  <p className="text-muted-foreground mt-0.5">End: {trip.end_date ? formatDate(trip.end_date) : 'Not set'}</p>
                 </div>
               </div>
 
@@ -528,7 +537,7 @@ export default function TripDetailPage() {
           </div>
 
           {activeBottomTab === 'history' ? (
-            <Card className="p-4">
+            <Card className="p-4 max-h-[520px] overflow-y-auto">
               <HistoryTimeline auditableType="trip" auditableId={trip.id} />
             </Card>
           ) : (
@@ -546,9 +555,9 @@ export default function TripDetailPage() {
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
+                    <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border sticky top-0 z-10 backdrop-blur">
                       <tr>
                         <th className="py-2.5 px-4 text-left font-medium">Category</th>
                         <th className="py-2.5 px-4 text-left font-medium">Details / Fuel Analysis</th>
@@ -565,95 +574,150 @@ export default function TripDetailPage() {
                           </td>
                         </tr>
                       ) : (
-                        trip.expenses?.map((exp) => (
-                          <tr key={exp.id} className="hover:bg-muted/40 transition-colors">
-                            <td className="py-3 px-4">
-                              <span className="font-semibold text-foreground capitalize block">
-                                {exp.category.replace(/_/g, ' ')}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {formatDateTime(exp.incurred_at)}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-xs">
-                              {exp.category === 'fuel' && exp.litres ? (
-                                <div className="space-y-1">
-                                  <span className="font-mono text-muted-foreground">
-                                    {exp.litres} L @ Odo {exp.odometer_at_fill || 'N/A'}
-                                  </span>
-                                  {exp.fuel_analysis && exp.fuel_analysis.is_anomaly && (
-                                    <div className="flex items-center gap-1 text-[11px] font-bold text-destructive">
-                                      <AlertTriangle className="h-3.5 w-3.5" />
+                        trip.expenses?.map((exp) => {
+                          const receipts = (exp.receipts?.length ? exp.receipts : (exp as any).attachments) as any[] | undefined;
+                          return (
+                            <tr key={exp.id} className="hover:bg-muted/40 transition-colors">
+                              <td className="py-3 px-4">
+                                <span className="font-semibold text-foreground capitalize block">
+                                  {exp.category.replace(/_/g, ' ')}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {formatDateTime(exp.incurred_at)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-xs align-top">
+                                <div className="space-y-1.5 min-w-[220px]">
+                                  <p className="text-muted-foreground">
+                                    Entered by {exp.entered_by_name || 'Staff'}
+                                  </p>
+                                  {(exp.litres != null || exp.odometer_at_fill != null) && (
+                                    <p className="font-mono text-[11px] text-foreground/80">
+                                      {exp.litres != null ? `${exp.litres} L` : 'Fuel qty N/A'}
+                                      {exp.odometer_at_fill != null ? ` @ Odo ${exp.odometer_at_fill} km` : ''}
+                                    </p>
+                                  )}
+                                  {exp.notes && (
+                                    <p className="text-[11px] text-muted-foreground whitespace-pre-wrap">
+                                      <span className="font-medium text-foreground/80">Notes/Ref:</span> {exp.notes}
+                                    </p>
+                                  )}
+                                  {(exp.receipt_path || receipts?.length) && (
+                                    <div className="text-[11px] text-primary space-y-0.5">
+                                      <span className="font-medium text-foreground/80">Receipts:</span>{' '}
+                                      {receipts?.length ? (
+                                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                                          {receipts.map((r: any, idx: number) => {
+                                            const p = typeof r === 'string' ? r : r?.url || r?.path || r?.file_path;
+                                            const href = getFileUrl(p);
+                                            const label = typeof r === 'string' ? `Receipt ${idx + 1}` : r?.name || r?.original_name || `Receipt ${idx + 1}`;
+                                            const openPath = r?.id ? `/expenses/${exp.id}/attachments/${r.id}` : (p || `/expenses/${exp.id}/receipt`);
+                                            return href || r?.id ? (
+                                              <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => openProtectedFile(openPath).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                                                className="underline hover:text-primary/80"
+                                              >
+                                                {label}
+                                              </button>
+                                            ) : (
+                                              <span key={idx} className="text-muted-foreground">{label}</span>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : getFileUrl(exp.receipt_path) ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => openProtectedFile(`/expenses/${exp.id}/receipt`).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                                          className="underline hover:text-primary/80 ml-1"
+                                        >
+                                          Open receipt
+                                        </button>
+                                      ) : (
+                                        <span className="text-muted-foreground ml-1">attached</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {exp.fuel_analysis?.is_anomaly && (
+                                    <div className="flex items-start gap-1 text-[11px] font-semibold text-destructive">
+                                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                                       <span>
-                                        Anomaly: {exp.fuel_analysis.km_per_litre} km/L ({exp.fuel_analysis.deviation_pct}% below rolling avg)
+                                        Fuel anomaly: {exp.fuel_analysis.km_per_litre} km/L ({exp.fuel_analysis.deviation_pct}% dev)
+                                        {exp.fuel_analysis.reason ? `   ${exp.fuel_analysis.reason}` : ''}
                                       </span>
                                     </div>
                                   )}
+                                  {exp.rejection_reason && (
+                                    <p className="text-[11px] text-destructive">
+                                      <span className="font-semibold">Rejection reason:</span> {exp.rejection_reason}
+                                    </p>
+                                  )}
                                 </div>
-                              ) : (
-                                <span className="text-muted-foreground">
-                                  Entered by {exp.entered_by_name || 'Staff'}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono font-semibold">
-                              <MoneyText amount={exp.amount} size="base" />
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              <StatusBadge status={exp.status} />
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                  onClick={() => setEditingExpense(exp)}
-                                  title="Edit expense details"
-                                >
-                                  <Edit3 className="h-3.5 w-3.5 mr-1" />
-                                  Edit
-                                </Button>
-
-                                {exp.status === 'pending' && (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success-bg"
-                                      onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'approved' })}
-                                    >
-                                      Approve
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive-bg"
-                                      onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'rejected', reason: 'Disallowed by accountant' })}
-                                    >
-                                      Reject
-                                    </Button>
-                                  </>
-                                )}
-
-                                {/* Reassign Misassigned Expense to Another Trip */}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                  onClick={() => {
-                                    setExpenseToReassign(exp);
-                                    setReassignModalOpen(true);
-                                  }}
-                                  title="Reassign to another trip"
-                                >
-                                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                                  Reassign
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                              </td>
+                              <td className="py-3 px-4 text-right font-mono font-semibold align-top">
+                                <MoneyText amount={exp.amount} size="base" />
+                              </td>
+                              <td className="py-3 px-4 text-center align-top">
+                                <StatusBadge status={exp.status} />
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => setEditingExpense(exp)}
+                                    title="Edit expense details"
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                    Edit
+                                  </Button>
+                                  {exp.status === 'pending' && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success-bg"
+                                        onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'approved' })}
+                                      >
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive-bg"
+                                        onClick={() => {
+                                          const reason = window.prompt('Reason for rejecting this expense (required):', '');
+                                          if (reason && reason.trim()) {
+                                            expenseStatusMutation.mutate({ expenseId: exp.id, status: 'rejected', reason: reason.trim() });
+                                          } else if (reason !== null) {
+                                            toast.error('Rejection reason is required');
+                                          }
+                                        }}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => {
+                                      setExpenseToReassign(exp);
+                                      setReassignModalOpen(true);
+                                    }}
+                                    title="Reassign to another trip"
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                    Reassign
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -690,23 +754,29 @@ export default function TripDetailPage() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
                   Approved Direct Expenses
                 </span>
-                {pnl?.breakdown_by_category && (
-                  Object.entries(pnl.breakdown_by_category).map(([cat, amt]) => {
-                    if (amt <= 0) return null;
-                    return (
-                      <div key={cat} className="flex justify-between text-muted-foreground">
-                        <span className="capitalize">{cat.replace(/_/g, ' ')}</span>
-                        <MoneyText amount={amt} size="sm" />
-                      </div>
-                    );
-                  })
-                )}
+                {pnl?.breakdown_by_category && (() => {
+                  const entries = Object.entries(pnl.breakdown_by_category)
+                    .filter(([, amt]) => Number(amt) > 0)
+                    .sort((a, b) => Number(b[1]) - Number(a[1]));
+                  if (!entries.length) {
+                    return <p className="text-muted-foreground text-[11px]">No approved direct expenses yet.</p>;
+                  }
+                  return (
+                    <div className="max-h-36 overflow-y-auto overscroll-contain pr-1 space-y-1.5 rounded-md border border-border/50 bg-background/40 p-2">
+                      {entries.map(([cat, amt]) => (
+                        <div key={cat} className="flex items-center justify-between text-muted-foreground gap-3 text-[11px] shrink-0">
+                          <span className="capitalize truncate">{cat.replace(/_/g, ' ')}</span>
+                          <MoneyText amount={amt} size="sm" />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between font-semibold text-destructive pt-2 border-t border-border/40">
                   <span>Total Direct Costs</span>
                   <MoneyText amount={pnl?.approved_direct_costs ?? 0} variant="negative" size="base" />
                 </div>
               </div>
-
               {/* Contribution Highlight Box */}
               <div className="p-4 rounded-xl bg-success-bg/80 border border-success/30 text-success-foreground space-y-1">
                 <div className="flex items-center justify-between">
@@ -738,7 +808,7 @@ export default function TripDetailPage() {
                 )}
               </CardTitle>
               <CardDescription>
-                Settlement trail: advance given → accepted expenses → returned balance
+                Settlement trail: advance given â†’ accepted expenses â†’ returned balance
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 text-xs space-y-3">
@@ -844,21 +914,20 @@ export default function TripDetailPage() {
           >
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Expense Category</label>
-              <select
-                {...register('category')}
-                defaultValue=""
-                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary capitalize"
-              >
-                <option value="">-- Select category --</option>
-                <option value="fuel">Fuel (Diesel Refill)</option>
-                <option value="allowance">Driver Allowance (Per Diem)</option>
-                <option value="toll">Toll &amp; Weighing Cess</option>
-                <option value="county_levy_cess">County Levy / Cess</option>
-                <option value="border_fees">Border Clearance Fees</option>
-                <option value="loading_offloading">Loading / Offloading</option>
-                <option value="repairs">Emergency En-Route Repairs</option>
-                <option value="other">Other Incidentals</option>
-              </select>
+              <Controller
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <CategorySelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    suggestions={(trip.expenses || []).map((e) => e.category)}
+                  />
+                )}
+              />
+              {expenseErrors.category && (
+                <p className="text-[11px] text-destructive mt-1">{expenseErrors.category.message}</p>
+              )}
             </div>
 
             <div>
@@ -976,7 +1045,7 @@ export default function TripDetailPage() {
                   ?.filter((t) => t.id !== Number(tripId))
                   ?.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.reference} — {t.origin} to {t.destination} ({t.truck?.reg_number})
+                      {t.reference} â€” {t.origin} to {t.destination} ({t.truck?.reg_number})
                     </option>
                   ))}
               </select>
@@ -1146,4 +1215,5 @@ export default function TripDetailPage() {
     </div>
   );
 }
+
 
