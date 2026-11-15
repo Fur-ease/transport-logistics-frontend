@@ -1,4 +1,5 @@
 'use client';
+import { syncFinancialState } from '@/lib/liveSync';
 
 import React, { useEffect } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
@@ -99,24 +100,20 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, mode, truck?.id]);
 
-  const invalidate = () => {
+  const invalidate = async () => {
     if (!truck) return;
-    queryClient.invalidateQueries({ queryKey: ['trucks'] });
-    queryClient.invalidateQueries({ queryKey: ['trucks-list'] });
-    queryClient.invalidateQueries({ queryKey: ['truck', String(truck.id)] });
-    queryClient.invalidateQueries({ queryKey: ['trailers'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    await syncFinancialState(queryClient);
   };
 
   const coupleMutation = useMutation({
     mutationFn: (data: CoupleFormData) => api.post(`/trucks/${truck?.id}/couple`, data),
-    onSuccess: (response: unknown) => {
+    onSuccess: async (response: unknown) => {
       const message =
         response && typeof response === 'object' && 'message' in response
           ? String((response as { message: string }).message)
           : 'Trailer coupled successfully';
+      await invalidate();
       toast.success(message);
-      invalidate();
       onOpenChange(false);
     },
     onError: (err: Error) => toast.error(err.message || 'Failed to couple trailer'),
@@ -124,13 +121,13 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
 
   const uncoupleMutation = useMutation({
     mutationFn: (data: UncoupleFormData) => api.post(`/trucks/${truck?.id}/uncouple`, data),
-    onSuccess: (response: unknown) => {
+    onSuccess: async (response: unknown) => {
       const message =
         response && typeof response === 'object' && 'message' in response
           ? String((response as { message: string }).message)
           : 'Trailer uncoupled successfully';
+      await invalidate();
       toast.success(message);
-      invalidate();
       onOpenChange(false);
     },
     onError: (err: Error) => toast.error(err.message || 'Failed to uncouple trailer'),

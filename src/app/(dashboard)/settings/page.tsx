@@ -1,4 +1,5 @@
 'use client';
+import { syncFinancialState } from '@/lib/liveSync';
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -103,8 +104,8 @@ export default function SettingsPage() {
         name: orgName,
         fuel_alert_threshold_pct: fuelThreshold,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings-org'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Organization settings saved');
     },
     onError: (err: Error) => {
@@ -120,15 +121,12 @@ export default function SettingsPage() {
     formState: { errors: userErrors },
   } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
-    defaultValues: {
-      role: 'driver',
-    },
   });
 
   const createUserMutation = useMutation({
     mutationFn: (userData: UserFormData) => api.post('/settings/users', userData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('User invited to workspace');
       setAddUserModalOpen(false);
       reset();
@@ -145,9 +143,9 @@ export default function SettingsPage() {
       threshold_days?: number | null;
       threshold_amount?: number | null;
     }) => api.put('/settings/rule-thresholds', payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings-rules'] });
-      queryClient.invalidateQueries({ queryKey: ['missing-entries'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
       toast.success('Data quality rule updated');
     },
     onError: (err: Error) => {
@@ -248,7 +246,7 @@ export default function SettingsPage() {
                           <span>{m.name}</span>
                         </td>
                         <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.email}</td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.phone || '—'}</td>
+                        <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.phone || 'â€”'}</td>
                         <td className="py-3.5 px-4 text-center">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize bg-secondary text-foreground border border-border">
                             {m.role}
@@ -373,7 +371,7 @@ export default function SettingsPage() {
                                 <span>{rule.threshold_days} days</span>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="text-muted-foreground">â€”</span>
                             )}
                           </td>
                           <td className="py-3 px-3">
@@ -382,7 +380,7 @@ export default function SettingsPage() {
                                 KSh {rule.threshold_amount.toLocaleString()}
                               </div>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="text-muted-foreground">â€”</span>
                             )}
                           </td>
                           <td className="py-3 px-3 text-right">

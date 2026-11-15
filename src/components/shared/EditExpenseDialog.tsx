@@ -107,9 +107,9 @@ export function EditExpenseDialog({
         version: expense.version ?? 1,
       });
     },
-    onSuccess: (res: any) => {
+    onSuccess: async (res: any) => {
       toast.success(res?.message || 'Expense updated successfully');
-      syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
       onOpenChange(false);
       onSuccess?.();
     },
@@ -313,8 +313,8 @@ export function EditExpenseDialog({
         onClose={() => setConcurrencyError({ open: false })}
         serverVersion={concurrencyError.currentVersion}
         conflictFields={concurrencyError.conflictFields}
-        onRefresh={() => {
-          syncFinancialState(queryClient);
+        onRefresh={async () => {
+          await syncFinancialState(queryClient);
           onOpenChange(false);
         }}
       />

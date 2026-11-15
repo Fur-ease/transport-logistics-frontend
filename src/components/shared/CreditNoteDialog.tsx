@@ -44,9 +44,9 @@ export function CreditNoteDialog({
         reason,
       });
     },
-    onSuccess: (res: any) => {
+    onSuccess: async (res: any) => {
       toast.success(res?.message || 'Credit note issued successfully');
-      syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
       onOpenChange(false);
       setAmount('');
       setReason('');

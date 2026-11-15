@@ -157,7 +157,6 @@ export default function TripsPage() {
         page,
         per_page: perPage,
       }),
-    refetchInterval: 30000,
   });
 
   const trips = data?.data || [];
@@ -194,15 +193,9 @@ export default function TripsPage() {
     formState: { errors },
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema),
-    defaultValues: {
-      start_date: new Date().toISOString().split('T')[0],
-      agreed_rate: 120000,
-      cargo_weight_tons: 25,
-      start_odometer: 0,
-    },
   });
 
-  // Watch selected truck to prefill starting odometer and coupled trailer
+  // Watch selected truck for availability/filtering (no auto-prefill of trip fields)
   const selectedTruckId = watch('truck_id');
   const tripStartDate = watch('start_date');
   const tripEndDate = watch('end_date');
@@ -216,23 +209,15 @@ export default function TripsPage() {
   const selectedTruckOption = truckOptions.find(
     (option) => option.truck.id === Number(selectedTruckId)
   );
-  React.useEffect(() => {
-    if (selectedTruck) {
-      if (selectedTruck.odometer_km) {
-        setValue('start_odometer', selectedTruck.odometer_km);
-      }
-      setValue('trailer_id', selectedTruck.current_assignment?.trailer_id ?? null);
-    }
-  }, [selectedTruck, setValue]);
 
-  const invalidateTrips = () => {
-    syncFinancialState(queryClient);
+  const invalidateTrips = async () => {
+    await syncFinancialState(queryClient);
   };
 
   const createMutation = useMutation({
     mutationFn: (newTrip: TripFormData) => api.post('/trips', newTrip),
-    onSuccess: () => {
-      invalidateTrips();
+    onSuccess: async () => {
+      await invalidateTrips();
       toast.success('Trip created and dispatched successfully');
       setSheetOpen(false);
       reset();
@@ -244,8 +229,8 @@ export default function TripsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (trip: Trip) => api.delete<{ message?: string }>(`/trips/${trip.id}`),
-    onSuccess: (response) => {
-      invalidateTrips();
+    onSuccess: async (response) => {
+      await invalidateTrips();
       toast.success(response?.message || 'Trip removed successfully');
       setTripToDelete(null);
     },
@@ -261,8 +246,8 @@ export default function TripsPage() {
         status: 'in_transit',
         reason: 'Dispatched from trips table',
       }),
-    onSuccess: () => {
-      invalidateTrips();
+    onSuccess: async () => {
+      await invalidateTrips();
       toast.success('Trip marked as in transit');
     },
     onError: (err: Error) => {
@@ -583,7 +568,7 @@ export default function TripsPage() {
                     </div>
                   </td>
                   <td className="py-3.5 px-4">
-                    <p className="font-semibold text-foreground">{trip.origin} → {trip.destination}</p>
+                    <p className="font-semibold text-foreground">{trip.origin} â†’ {trip.destination}</p>
                     <p className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDate(trip.start_date)} {trip.end_date ? `to ${formatDate(trip.end_date)}` : '• Ongoing'}
                     </p>
@@ -626,7 +611,7 @@ export default function TripsPage() {
       {data && data.total > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
           <p className="text-xs text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{data.from ?? 0}</span>–
+            Showing <span className="font-semibold text-foreground">{data.from ?? 0}</span>â€“
             <span className="font-semibold text-foreground">{data.to ?? 0}</span> of{' '}
             <span className="font-semibold text-foreground">{totalTrips}</span> trips
           </p>
@@ -692,8 +677,8 @@ export default function TripsPage() {
                 <option value="">-- Select fleet vehicle --</option>
                 {truckOptions.map(({ truck: t, disabled, reason, note }) => (
                   <option key={t.id} value={t.id} disabled={disabled}>
-                    {t.reg_number} — {t.make} {t.model}
-                    {disabled ? ` — ${reason}` : note ? ` — ${note}` : ` (${t.status})`}
+                    {t.reg_number} â€” {t.make} {t.model}
+                    {disabled ? ` â€” ${reason}` : note ? ` â€” ${note}` : ` (${t.status})`}
                   </option>
                 ))}
               </select>
@@ -705,18 +690,40 @@ export default function TripsPage() {
                   {selectedTruckOption.reason}. Pick another truck or adjust the dates.
                 </p>
               )}
+            </div>
+
+            {/* Trailer */}
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">Trailer</label>
+              <select
+                {...register('trailer_id', {
+                  setValueAs: (v) => (v === '' || v === undefined ? null : Number(v)),
+                })}
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                disabled={!selectedTruck}
+              >
+                <option value="">-- Select trailer --</option>
+                {!selectedTruck && <option value="" disabled>Select a truck first</option>}
+                {selectedTruck?.current_assignment?.trailer && (
+                  <option value={selectedTruck.current_assignment.trailer.id}>
+                    {selectedTruck.current_assignment.trailer.reg_number} (coupled)
+                  </option>
+                )}
+                {selectedTruck && !selectedTruck.current_assignment && (
+                  <option value="">No trailer (head-only)</option>
+                )}
+              </select>
               {selectedTruck?.current_assignment?.trailer && (
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Coupled trailer{' '}
+                  This truck head is coupled to{' '}
                   <span className="font-mono font-semibold text-foreground">
                     {selectedTruck.current_assignment.trailer.reg_number}
-                  </span>{' '}
-                  will be dispatched with this trip.
+                  </span>. Select it for the trip, or uncouple the truck first.
                 </p>
               )}
               {selectedTruck && !selectedTruck.current_assignment && (
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  This truck head has no trailer coupled; the trip will be recorded as head-only.
+                  This truck head has no trailer coupled. Select head-only to continue.
                 </p>
               )}
             </div>

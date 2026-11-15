@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
@@ -242,15 +242,10 @@ export default function TripProfitSheetPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={
-          <div className="flex items-center gap-2">
-            <span>Trip Profit Sheet</span>
-            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full border border-border">
-              Advancement C
-            </span>
-          </div>
-        }
+        title="Trip Profit Sheet"
         description="Comprehensive profitability audit per trip and truck based on verified delivery dates and approved expenses."
+        backHref="/reports"
+        backLabel="Back to reports"
         actions={
           !isDriver ? (
             <div className="flex items-center gap-2">
@@ -498,7 +493,7 @@ export default function TripProfitSheetPage() {
               ? '...'
               : summary?.margin_pct !== null && summary?.margin_pct !== undefined
               ? `${summary.margin_pct.toFixed(1)}%`
-              : '—'
+              : 'â€”'
           }
           valueClassName={
             (summary?.margin_pct || 0) < 0 ? 'text-destructive font-bold' : 'text-foreground font-bold'
@@ -578,7 +573,7 @@ export default function TripProfitSheetPage() {
                         {formatKES(ts.contribution)}
                       </td>
                       <td className="py-2 px-3 text-right tabular-nums font-medium">
-                        {ts.margin_pct !== null ? `${ts.margin_pct.toFixed(1)}%` : '—'}
+                        {ts.margin_pct !== null ? `${ts.margin_pct.toFixed(1)}%` : 'â€”'}
                       </td>
                       <td className="py-2 px-3 text-right tabular-nums font-semibold">
                         {formatKES(ts.contribution_per_trip)}
@@ -748,7 +743,7 @@ export default function TripProfitSheetPage() {
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right tabular-nums font-semibold">
-                        {row.margin_pct !== null ? `${row.margin_pct.toFixed(1)}%` : '—'}
+                        {row.margin_pct !== null ? `${row.margin_pct.toFixed(1)}%` : 'â€”'}
                       </td>
                     </tr>
                   ))
@@ -788,7 +783,7 @@ export default function TripProfitSheetPage() {
                       {formatKES(summary.contribution)}
                     </td>
                     <td className="py-3 px-3 text-right tabular-nums text-xs font-mono">
-                      {summary.margin_pct !== null ? `${summary.margin_pct.toFixed(1)}%` : '—'}
+                      {summary.margin_pct !== null ? `${summary.margin_pct.toFixed(1)}%` : 'â€”'}
                     </td>
                   </tr>
                 </tfoot>

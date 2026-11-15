@@ -134,9 +134,9 @@ export function EditTripSheet({
         version: trip.version ?? 1,
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(`Trip ${trip.reference} updated successfully`);
-      syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
       onOpenChange(false);
       onSuccess?.();
     },
@@ -160,9 +160,9 @@ export function EditTripSheet({
         duration_minutes: 60,
       });
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       toast.success(data?.message || 'Trip unlocked for editing');
-      syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
       setShowUnlockModal(false);
     },
     onError: (err: any) => {
@@ -461,8 +461,8 @@ export function EditTripSheet({
         onClose={() => setConcurrencyError({ open: false })}
         serverVersion={concurrencyError.currentVersion}
         conflictFields={concurrencyError.conflictFields}
-        onRefresh={() => {
-          queryClient.invalidateQueries({ queryKey: ['trip', trip.id] });
+        onRefresh={async () => {
+          await syncFinancialState(queryClient);
           onOpenChange(false);
         }}
       />

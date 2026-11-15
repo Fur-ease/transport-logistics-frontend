@@ -46,9 +46,9 @@ export function AdvanceAdjustmentDialog({
         reason,
       });
     },
-    onSuccess: (res: any) => {
+    onSuccess: async (res: any) => {
       toast.success(res?.message || 'Advance adjustment registered successfully');
-      syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
       onOpenChange(false);
       setAmount('');
       setReason('');

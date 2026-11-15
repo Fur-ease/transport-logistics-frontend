@@ -1,4 +1,5 @@
 'use client';
+import { syncFinancialState } from '@/lib/liveSync';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -89,15 +90,15 @@ interface TrailerListResponse {
   };
 }
 
-const emptyTrailerForm: TrailerFormData = {
+const emptyTrailerForm = {
   reg_number: '',
-  type: 'skeletal',
+  type: '',
   make: '',
   model: '',
-  year: new Date().getFullYear(),
-  capacity_tons: 30,
+  year: undefined as unknown as number,
+  capacity_tons: undefined as unknown as number,
   tare_weight_tons: null,
-  status: 'available',
+  status: '' as unknown as TrailerFormData['status'],
   reason: '',
 };
 
@@ -167,15 +168,14 @@ export function TrailersPanel() {
     queryFn: () =>
       api.get<TrailerListResponse>('/trailers', {
         status: statusFilter,
-        type: typeFilter === 'all' ? undefined : typeFilter,
-        coupled: couplingFilter === 'all' ? undefined : couplingFilter,
+        search,
+        type: typeFilter || undefined,
+        coupled: couplingFilter || undefined,
         sort,
         direction,
-        search,
         page,
         per_page: perPage,
       }),
-    refetchInterval: 30000,
   });
 
   const trailers = data?.data || [];
@@ -193,11 +193,8 @@ export function TrailersPanel() {
     defaultValues: emptyTrailerForm,
   });
 
-  const invalidateTrailers = () => {
-    queryClient.invalidateQueries({ queryKey: ['trailers'] });
-    queryClient.invalidateQueries({ queryKey: ['trucks'] });
-    queryClient.invalidateQueries({ queryKey: ['trucks-list'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+  const invalidateTrailers = async () => {
+    await syncFinancialState(queryClient);
   };
 
   const createMutation = useMutation({
@@ -528,9 +525,9 @@ export function TrailersPanel() {
                   </td>
                   <td className="py-3.5 px-4">
                     <p className="font-medium text-foreground">
-                      {trailer.make || '—'} {trailer.model || ''}
+                      {trailer.make || 'â€”'} {trailer.model || ''}
                     </p>
-                    <p className="text-xs text-muted-foreground">{trailer.year || '—'}</p>
+                    <p className="text-xs text-muted-foreground">{trailer.year || 'â€”'}</p>
                   </td>
                   <td className="py-3.5 px-4">
                     <p className="font-medium text-xs capitalize">{trailer.type.replace('_', ' ')}</p>
@@ -571,7 +568,7 @@ export function TrailersPanel() {
       {meta && meta.total > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
           <p className="text-xs text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{meta.from ?? 0}</span>–
+            Showing <span className="font-semibold text-foreground">{meta.from ?? 0}</span>â€“
             <span className="font-semibold text-foreground">{meta.to ?? 0}</span> of{' '}
             <span className="font-semibold text-foreground">{totalTrailers}</span> trailers
           </p>
@@ -707,7 +704,7 @@ export function TrailersPanel() {
               <label className="text-xs font-semibold text-foreground block mb-1">Status</label>
               {editingTrailer?.active_assignment ? (
                 <div className="h-10 px-3 flex items-center rounded-lg border border-border bg-secondary/60 text-sm text-foreground">
-                  In Use — coupled to {editingTrailer.active_assignment.truck?.reg_number ?? 'a truck head'}
+                  In Use â€” coupled to {editingTrailer.active_assignment.truck?.reg_number ?? 'a truck head'}
                 </div>
               ) : (
                 <select

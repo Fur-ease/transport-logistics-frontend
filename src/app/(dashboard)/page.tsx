@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Plus,
-  Calendar,
   Layers,
   ArrowRight,
   RefreshCw,
@@ -34,99 +33,138 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
-import { formatKES, formatNumber, formatDate } from '@/lib/formatters';
+import { formatKES, formatDate } from '@/lib/formatters';
 import { DashboardStats } from '@/types';
 import { LIVE_REFETCH_MS } from '@/lib/liveSync';
 import { useAuth } from '@/components/providers/AuthProvider';
 
+function toIsoDate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [range, setRange] = useState<'30' | '90' | 'this_month'>('30');
+  const today = useMemo(() => new Date(), []);
+  const [preset, setPreset] = useState<'30' | '90' | 'this_month' | 'custom'>('30');
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return toIsoDate(d);
+  });
+  const [toDate, setToDate] = useState(() => toIsoDate(new Date()));
+
+  useEffect(() => {
+    if (preset === 'custom') return;
+    const now = new Date();
+    if (preset === 'this_month') {
+      setFromDate(toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1)));
+      setToDate(toIsoDate(now));
+    } else if (preset === '90') {
+      const d = new Date();
+      d.setDate(d.getDate() - 89);
+      setFromDate(toIsoDate(d));
+      setToDate(toIsoDate(now));
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() - 29);
+      setFromDate(toIsoDate(d));
+      setToDate(toIsoDate(now));
+    }
+  }, [preset]);
 
   const { data: missingResponse } = useQuery<{
     summary: { total_open: number; data_completeness_pct: number };
   }>({
     queryKey: ['missing-entries-summary'],
     queryFn: () => api.get('/missing-entries?per_page=1'),
-    refetchInterval: 30000,
+    placeholderData: (prev) => prev,
   });
   const missingSummary = missingResponse?.summary;
 
-  const { data: stats, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats', range],
-    queryFn: () => {
-      let from = '';
-      const to = '';
-      const now = new Date();
-
-      if (range === 'this_month') {
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        from = firstDay.toISOString().split('T')[0];
-      } else if (range === '90') {
-        const past = new Date(now.setDate(now.getDate() - 90));
-        from = past.toISOString().split('T')[0];
-      } else {
-        const past = new Date(now.setDate(now.getDate() - 30));
-        from = past.toISOString().split('T')[0];
-      }
-
-      return api.get<DashboardStats>('/dashboard/stats', { from, to });
-    },
+  const { data: stats, isPending, isError, isFetching, refetch, dataUpdatedAt } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats', fromDate, toDate],
+    queryFn: () => api.get<DashboardStats>('/dashboard/stats', { from: fromDate, to: toDate }),
     refetchInterval: LIVE_REFETCH_MS,
+    placeholderData: (prev) => prev,
   });
 
-  const chartData = stats?.trips_per_truck?.trucks?.map((t) => ({
+  const truckRows = stats?.trips_per_truck?.trucks || [];
+  const chartData = truckRows.slice(0, 25).map((t) => ({
     reg_number: t.reg_number,
     trips: t.trips_made,
     contribution: t.contribution,
     revenue: t.revenue,
     expenses: t.expenses,
-  })) || [];
+  }));
+
+  const showInitialSkeleton = isPending;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={`Habari, ${user?.name ? user.name.split(' ')[0] : 'Transporter'}`}
-        description="Here is your fleet performance, trip contribution, and compliance watchlist in Kenya Shillings."
+        description="Live fleet performance and money metrics for the selected period (Kenya Shillings)."
         actions={
-          <div className="flex items-center gap-2">
-            {/* Date filter toggle */}
-            <div className="flex items-center rounded-lg border border-border bg-card p-1 shadow-sm text-xs">
-              <button
-                onClick={() => setRange('30')}
-                className={`px-3 py-1 rounded-md font-medium transition-colors cursor-pointer ${
-                  range === '30' ? 'bg-primary text-white font-semibold' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Last 30 Days
-              </button>
-              <button
-                onClick={() => setRange('this_month')}
-                className={`px-3 py-1 rounded-md font-medium transition-colors cursor-pointer ${
-                  range === 'this_month' ? 'bg-primary text-white font-semibold' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                This Month
-              </button>
-              <button
-                onClick={() => setRange('90')}
-                className={`px-3 py-1 rounded-md font-medium transition-colors cursor-pointer ${
-                  range === '90' ? 'bg-primary text-white font-semibold' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Last 90 Days
-              </button>
-            </div>
-
-            <Button asChild size="sm">
-              <Link href="/trips?action=create">
-                <Plus className="mr-1.5 h-4 w-4" />
-                <span>New Trip</span>
-              </Link>
-            </Button>
-          </div>
+          <Button asChild size="sm">
+            <Link href="/trips?action=create">
+              <Plus className="mr-1.5 h-4 w-4" />
+              <span>New Trip</span>
+            </Link>
+          </Button>
         }
       />
+
+      <Card>
+        <CardContent className="p-3 flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/30 p-1 text-xs w-fit">
+            {([
+              ['30', 'Last 30 Days'],
+              ['this_month', 'This Month'],
+              ['90', 'Last 90 Days'],
+              ['custom', 'Custom'],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setPreset(key)}
+                className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+                  preset === key ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-xs text-muted-foreground">
+              <span className="block mb-1 font-medium">From</span>
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate}
+                onChange={(e) => { setFromDate(e.target.value); setPreset('custom'); }}
+                className="h-9 rounded-md border border-input bg-card px-2 text-sm text-foreground"
+              />
+            </label>
+            <label className="text-xs text-muted-foreground">
+              <span className="block mb-1 font-medium">To</span>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate}
+                max={toIsoDate(today)}
+                onChange={(e) => { setToDate(e.target.value); setPreset('custom'); }}
+                className="h-9 rounded-md border border-input bg-card px-2 text-sm text-foreground"
+              />
+            </label>
+            <div className="text-xs text-muted-foreground pb-2">
+              Showing <span className="font-semibold text-foreground">{formatDate(fromDate)}</span> â€“ <span className="font-semibold text-foreground">{formatDate(toDate)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
@@ -134,8 +172,8 @@ export default function DashboardPage() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          Live financials · auto-refresh every 15s
-          {dataUpdatedAt ? ` · updated ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}
+          Live financials Â· auto-refresh every 15s
+          {dataUpdatedAt ? ` Â· updated ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}
         </span>
         <Button
           variant="ghost"
@@ -149,8 +187,18 @@ export default function DashboardPage() {
         </Button>
       </div>
 
+      {isError && !stats ? (
+        <Card className="p-4 border-destructive/40 bg-destructive/5">
+          <p className="text-sm font-medium text-destructive">Failed to load dashboard data.</p>
+          <p className="text-xs text-muted-foreground mt-1">Check connection/login and try refresh.</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry
+          </Button>
+        </Card>
+      ) : null}
+
       {/* KPI Stat Cards Grid */}
-      {isLoading ? (
+      {showInitialSkeleton ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="p-4 space-y-2">
@@ -177,7 +225,7 @@ export default function DashboardPage() {
           <StatCard
             title="Agreed Revenue"
             value={formatKES(stats?.kpis.revenue ?? 0)}
-            subtitle="Total invoiced & billed"
+            subtitle="Agreed (in-transit & completed, period)"
             icon={<TrendingUp className="h-5 w-5" />}
           />
           <StatCard
@@ -237,7 +285,8 @@ export default function DashboardPage() {
             <div>
               <CardTitle>Trips Made Per Truck</CardTitle>
               <CardDescription>
-                Completed hauls per fleet vehicle for the selected period
+                Completed hauls per truck for selected period
+                {truckRows.length > 25 ? ` (showing top 25 of ${truckRows.length})` : ''}
               </CardDescription>
             </div>
             <Button asChild variant="outline" size="sm">
@@ -248,11 +297,11 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="pt-4">
-            {isLoading ? (
+            {showInitialSkeleton ? (
               <Skeleton className="h-72 w-full" />
             ) : chartData.length === 0 ? (
               <div className="h-72 flex items-center justify-center text-sm text-muted-foreground">
-                No trips recorded in this period.
+                No completed trips recorded in this period.
               </div>
             ) : (
               <div className="h-72 w-full">
@@ -263,7 +312,11 @@ export default function DashboardPage() {
                       dataKey="reg_number"
                       tickLine={false}
                       axisLine={false}
-                      tick={{ fill: '#5B6B7F', fontSize: 12, fontFamily: 'monospace' }}
+                      interval={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={60}
+                      tick={{ fill: '#5B6B7F', fontSize: 11, fontFamily: 'monospace' }}
                     />
                     <YAxis
                       tickLine={false}
@@ -297,7 +350,6 @@ export default function DashboardPage() {
                         return null;
                       }}
                     />
-                    {/* Strict solid Harbor Blue fill without gradients */}
                     <Bar dataKey="trips" fill="#1E5AA8" radius={[6, 6, 0, 0]} maxBarSize={48} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -318,7 +370,7 @@ export default function DashboardPage() {
             </span>
           </CardHeader>
           <CardContent className="pt-2">
-            {isLoading ? (
+            {showInitialSkeleton ? (
               <div className="space-y-3">
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
@@ -333,18 +385,17 @@ export default function DashboardPage() {
 
       {/* Top vs Bottom Trucks Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Top Trucks by Contribution */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base text-success flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               <span>Top Trucks by Contribution</span>
             </CardTitle>
-            <CardDescription>Vehicles generating highest contribution margin</CardDescription>
+            <CardDescription>Highest contribution (revenue âˆ’ approved direct costs) in period</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-border">
-              {stats?.top_trucks?.map((truck, idx) => (
+            <div className="divide-y divide-border max-h-80 overflow-auto">
+              {(stats?.top_trucks || []).map((truck, idx) => (
                 <div key={truck.truck_id} className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors">
                   <div className="flex items-center gap-3">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-muted-foreground">
@@ -354,7 +405,7 @@ export default function DashboardPage() {
                       <Link href={`/trucks/${truck.truck_id}`} className="font-mono font-semibold text-sm hover:underline text-foreground">
                         {truck.reg_number}
                       </Link>
-                      <p className="text-xs text-muted-foreground">{truck.make} {truck.model} • {truck.trips_made} trips</p>
+                      <p className="text-xs text-muted-foreground">{truck.make} {truck.model} â€¢ {truck.trips_made} trips</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -367,18 +418,17 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Bottom Trucks by Contribution */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base text-warning flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               <span>Lowest Earning / Under-Utilised Trucks</span>
             </CardTitle>
-            <CardDescription>Vehicles with lowest contribution or high idle days</CardDescription>
+            <CardDescription>Low/negative contribution or under-utilised; see full report for all trucks</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-border">
-              {stats?.bottom_trucks?.map((truck, idx) => (
+            <div className="divide-y divide-border max-h-80 overflow-auto">
+              {(stats?.bottom_trucks || []).map((truck, idx) => (
                 <div key={truck.truck_id} className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors">
                   <div className="flex items-center gap-3">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-muted-foreground">
@@ -388,13 +438,13 @@ export default function DashboardPage() {
                       <Link href={`/trucks/${truck.truck_id}`} className="font-mono font-semibold text-sm hover:underline text-foreground">
                         {truck.reg_number}
                       </Link>
-                      <p className="text-xs text-muted-foreground">{truck.make} {truck.model} • {truck.trips_made} trips</p>
+                      <p className="text-xs text-muted-foreground">{truck.make} {truck.model} â€¢ {truck.trips_made} trips</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <MoneyText amount={truck.contribution} size="base" />
                     <p className="text-[11px] text-muted-foreground tabular-nums">
-                      {truck.days_since_last_trip !== null ? `${truck.days_since_last_trip}d idle` : 'No recent trips'}
+                      {truck.days_since_last_trip !== null ? `${truck.days_since_last_trip}d idle` : 'No recent trips'} â€¢ {truck.utilisation_pct}% util
                     </p>
                   </div>
                 </div>
@@ -433,7 +483,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {isLoading ? (
+                {showInitialSkeleton ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i}>
                       <td colSpan={7} className="p-4">
@@ -449,7 +499,7 @@ export default function DashboardPage() {
                       </Link>
                     </td>
                     <td className="py-3.5 px-4">
-                      <p className="font-medium text-foreground">{trip.origin} → {trip.destination}</p>
+                      <p className="font-medium text-foreground">{trip.origin} â†’ {trip.destination}</p>
                       <p className="text-xs text-muted-foreground truncate max-w-xs">{trip.cargo_description}</p>
                     </td>
                     <td className="py-3.5 px-4">

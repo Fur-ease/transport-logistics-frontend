@@ -232,8 +232,8 @@ export default function TripDetailPage() {
 
       return api.upload(`/trips/${tripId}/expenses`, data);
     },
-    onSuccess: () => {
-      syncFinancialState(queryClient);
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Expense recorded successfully');
       setAddExpenseOpen(false);
       resetExpenseForm({
@@ -255,8 +255,8 @@ export default function TripDetailPage() {
   const expenseStatusMutation = useMutation({
     mutationFn: ({ expenseId, status, reason }: { expenseId: number; status: string; reason?: string }) =>
       api.patch(`/expenses/${expenseId}/status`, { status, rejection_reason: reason }),
-    onSuccess: () => {
-      syncFinancialState(queryClient);
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Expense status updated');
     },
   });
@@ -265,8 +265,8 @@ export default function TripDetailPage() {
   const reassignMutation = useMutation({
     mutationFn: ({ expenseId, targetTripId, reason }: { expenseId: number; targetTripId: number; reason: string }) =>
       api.post(`/expenses/${expenseId}/reassign`, { target_trip_id: targetTripId, reason }),
-    onSuccess: () => {
-      syncFinancialState(queryClient);
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Expense reassigned and logged in audit trail');
       setReassignModalOpen(false);
       setExpenseToReassign(null);
@@ -281,8 +281,8 @@ export default function TripDetailPage() {
   const tripStatusMutation = useMutation({
     mutationFn: (updates: { status: string; end_odometer?: number; end_date?: string }) =>
       api.put(`/trips/${tripId}`, updates),
-    onSuccess: () => {
-      syncFinancialState(queryClient);
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Trip status updated');
       setDeliveredModalOpen(false);
     },
@@ -295,8 +295,8 @@ export default function TripDetailPage() {
   const settleAdvanceMutation = useMutation({
     mutationFn: ({ advanceId, returned }: { advanceId: number; returned: number }) =>
       api.post(`/advances/${advanceId}/settle`, { amount_returned: returned }),
-    onSuccess: () => {
-      syncFinancialState(queryClient);
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Driver advance settlement updated');
       setSettleModalOpen(false);
       setSelectedAdvance(null);
@@ -310,8 +310,8 @@ export default function TripDetailPage() {
   // Create invoice mutation
   const createInvoiceMutation = useMutation({
     mutationFn: () => api.post('/invoices', { trip_id: Number(tripId) }),
-    onSuccess: () => {
-      syncFinancialState(queryClient);
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Invoice generated for customer');
     },
     onError: (err: Error) => {
@@ -406,8 +406,8 @@ export default function TripDetailPage() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
           </span>
-          Live trip P&L Â· auto-refresh every 15s
-          {tripUpdatedAt ? ` Â· updated ${new Date(tripUpdatedAt).toLocaleTimeString()}` : ''}
+          Live trip P&L · auto-refresh every 15s
+          {tripUpdatedAt ? ` · updated ${new Date(tripUpdatedAt).toLocaleTimeString()}` : ''}
         </span>
         <Button
           variant="ghost"

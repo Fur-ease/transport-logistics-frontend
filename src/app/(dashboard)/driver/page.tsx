@@ -96,10 +96,6 @@ export default function DriverMobileViewPage() {
     formState: { errors },
   } = useForm<DriverExpenseFormData>({
     resolver: zodResolver(driverExpenseSchema),
-    defaultValues: {
-      category: 'fuel',
-      trip_id: activeTrip?.id || (trips[0]?.id ?? 0),
-    },
   });
 
   const watchCat = watch('category');
@@ -118,8 +114,8 @@ export default function DriverMobileViewPage() {
 
       return api.upload(`/trips/${formData.trip_id}/expenses`, data);
     },
-    onSuccess: () => {
-      syncFinancialState(queryClient);
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Expense receipt submitted to dispatch manager');
       setSheetOpen(false);
       reset();
@@ -187,7 +183,7 @@ export default function DriverMobileViewPage() {
               <StatusBadge status={activeTrip.status} />
             </div>
             <CardTitle className="text-base mt-1">
-              {activeTrip.origin} → {activeTrip.destination}
+              {activeTrip.origin} â†’ {activeTrip.destination}
             </CardTitle>
             <CardDescription className="text-xs">
               Truck: <span className="font-mono font-bold text-foreground">{activeTrip.truck?.reg_number}</span> • Cargo: {activeTrip.cargo_description}
@@ -234,7 +230,7 @@ export default function DriverMobileViewPage() {
             >
               <div>
                 <p className="font-mono font-bold text-primary">{t.reference}</p>
-                <p className="font-medium text-foreground text-xs mt-0.5">{t.origin} → {t.destination}</p>
+                <p className="font-medium text-foreground text-xs mt-0.5">{t.origin} â†’ {t.destination}</p>
                 <p className="text-[11px] text-muted-foreground">{formatDate(t.start_date)}</p>
               </div>
               <div className="text-right space-y-1">
@@ -276,7 +272,7 @@ export default function DriverMobileViewPage() {
               >
                 {trips.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.reference} — {t.origin} to {t.destination} ({t.status})
+                    {t.reference} â€” {t.origin} to {t.destination} ({t.status})
                   </option>
                 ))}
               </select>

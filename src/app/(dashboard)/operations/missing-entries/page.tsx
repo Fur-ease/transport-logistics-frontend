@@ -156,9 +156,9 @@ export default function MissingEntriesPage() {
   // Trigger manual rescan mutation
   const scanMutation = useMutation({
     mutationFn: () => api.post('/missing-entries/scan', {}),
-    onSuccess: (data: unknown) => {
+    onSuccess: async (_data: unknown) => {
+      await syncFinancialState(queryClient);
       toast.success('Fleet data quality scan completed.');
-      syncFinancialState(queryClient);
     },
     onError: (err: unknown) => {
       toast.error('Failed to trigger scan.');
@@ -178,10 +178,10 @@ export default function MissingEntriesPage() {
       await api.post(`/missing-entries/${dismissTarget.id}/dismiss`, {
         reason: dismissReason.trim(),
       });
+      await syncFinancialState(queryClient);
       toast.success('Data issue dismissed. It will not reappear unless data changes.');
       setDismissTarget(null);
       setDismissReason('');
-      syncFinancialState(queryClient);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to dismiss issue.';
       toast.error(msg);
@@ -196,8 +196,8 @@ export default function MissingEntriesPage() {
       await api.post(`/missing-entries/${issueId}/assign`, {
         assigned_to: userId,
       });
+      await syncFinancialState(queryClient);
       toast.success('Assigned staff updated.');
-      syncFinancialState(queryClient);
     } catch (err: unknown) {
       toast.error('Failed to assign staff.');
     }
@@ -272,6 +272,8 @@ export default function MissingEntriesPage() {
           </div>
         }
         description="Continuous scanner detecting incomplete trip logs, missing receipts, unbilled deliveries, and telemetry anomalies."
+        backHref="/"
+        backLabel="Back to dashboard"
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -565,10 +567,10 @@ export default function MissingEntriesPage() {
                         {/* Truck & Driver */}
                         <td className="py-3 px-3">
                           <div className="font-mono font-semibold text-foreground">
-                            {issue.truck?.reg_number || '—'}
+                            {issue.truck?.reg_number || 'â€”'}
                           </div>
                           <div className="text-[11px] text-muted-foreground">
-                            {issue.driver?.name || '—'}
+                            {issue.driver?.name || 'â€”'}
                           </div>
                         </td>
 

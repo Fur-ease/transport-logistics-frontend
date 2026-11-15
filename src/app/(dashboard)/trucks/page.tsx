@@ -1,4 +1,5 @@
 'use client';
+import { syncFinancialState } from '@/lib/liveSync';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -88,15 +89,15 @@ interface TruckListResponse {
   };
 }
 
-const emptyTruckForm: TruckFormData = {
+const emptyTruckForm = {
   reg_number: '',
   make: '',
   model: '',
-  year: new Date().getFullYear(),
-  type: 'Prime Mover',
-  capacity_tons: 28,
-  odometer_km: 0,
-  status: 'available',
+  year: undefined as unknown as number,
+  type: '',
+  capacity_tons: undefined as unknown as number,
+  odometer_km: undefined as unknown as number,
+  status: '' as unknown as TruckFormData['status'],
 };
 
 const statusOptions = [
@@ -159,14 +160,13 @@ export default function TrucksPage() {
       api.get<TruckListResponse>('/trucks', {
         status: statusFilter,
         search,
-        type: typeFilter === 'all' ? undefined : typeFilter,
-        coupled: couplingFilter === 'all' ? undefined : couplingFilter,
+        type: typeFilter || undefined,
+        coupled: couplingFilter || undefined,
         sort,
         direction,
         page,
         per_page: perPage,
       }),
-    refetchInterval: 30000,
   });
 
   const trucks = data?.data || [];
@@ -184,16 +184,14 @@ export default function TrucksPage() {
     defaultValues: emptyTruckForm,
   });
 
-  const invalidateFleet = () => {
-    queryClient.invalidateQueries({ queryKey: ['trucks'] });
-    queryClient.invalidateQueries({ queryKey: ['trucks-list'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+  const invalidateFleet = async () => {
+    await syncFinancialState(queryClient);
   };
 
   const createMutation = useMutation({
     mutationFn: (newTruck: TruckFormData) => api.post('/trucks', newTruck),
-    onSuccess: () => {
-      invalidateFleet();
+    onSuccess: async () => {
+      await invalidateFleet();
       toast.success('Truck registered into fleet successfully');
       setSheetOpen(false);
       reset(emptyTruckForm);
@@ -209,8 +207,8 @@ export default function TrucksPage() {
         ...payload,
         version: editingTruck?.version ?? 1,
       }),
-    onSuccess: () => {
-      invalidateFleet();
+    onSuccess: async () => {
+      await invalidateFleet();
       toast.success('Truck details updated successfully');
       setSheetOpen(false);
       setEditingTruck(null);
@@ -223,8 +221,8 @@ export default function TrucksPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (truck: Truck) => api.delete<{ message?: string }>(`/trucks/${truck.id}`),
-    onSuccess: (response) => {
-      invalidateFleet();
+    onSuccess: async (response) => {
+      await invalidateFleet();
       toast.success(response?.message || 'Truck removed successfully');
       setTruckToDelete(null);
     },

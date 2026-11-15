@@ -1,4 +1,5 @@
 'use client';
+import { syncFinancialState } from '@/lib/liveSync';
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -71,15 +72,12 @@ export default function CustomersPage() {
     formState: { errors },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
-    defaultValues: {
-      payment_terms_days: 30,
-    },
   });
 
   const createMutation = useMutation({
     mutationFn: (newCust: CustomerFormData) => api.post('/customers', newCust),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Customer registered successfully');
       setSheetOpen(false);
       reset();

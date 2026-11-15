@@ -61,6 +61,8 @@ export default function DriverDetailPage() {
       <PageHeader
         title={driver.name}
         description={`Licence: ${driver.licence_no} • Phone: ${driver.phone}`}
+        backHref="/drivers"
+        backLabel="Back to drivers"
         breadcrumbs={[
           { label: 'Drivers Roster', href: '/drivers' },
           { label: driver.name },

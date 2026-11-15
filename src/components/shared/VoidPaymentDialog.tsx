@@ -40,9 +40,9 @@ export function VoidPaymentDialog({
       if (!payment) return;
       return api.post(`/payments/${payment.id}/void`, { reason });
     },
-    onSuccess: (res: any) => {
+    onSuccess: async (res: any) => {
       toast.success(res?.message || 'Payment voided successfully');
-      syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
       onOpenChange(false);
       setReason('');
       onSuccess?.();

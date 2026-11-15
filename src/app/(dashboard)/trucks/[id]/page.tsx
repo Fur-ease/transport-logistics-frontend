@@ -99,7 +99,7 @@ function Pager({
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 border-t border-border">
       <p className="text-xs text-muted-foreground">
-        Showing <span className="font-semibold text-foreground">{meta.from ?? 0}</span>–
+        Showing <span className="font-semibold text-foreground">{meta.from ?? 0}</span>â€“
         <span className="font-semibold text-foreground">{meta.to ?? 0}</span> of{' '}
         <span className="font-semibold text-foreground">{meta.total}</span> {noun}
       </p>
@@ -293,10 +293,12 @@ export default function TruckDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${truck.reg_number} — ${truck.make} ${truck.model}`}
-        description={`${truck.type} • ${truck.year} • Capacity: ${truck.capacity_tons} Tons • Odometer: ${formatKm(truck.odometer_km)}`}
+        title={`${truck.reg_number} - ${truck.make} ${truck.model}`}
+        description={`${truck.type} | ${truck.year} | Capacity: ${truck.capacity_tons} Tons | Odometer: ${formatKm(truck.odometer_km)}`}
+        backHref="/trucks"
+        backLabel="Back to fleet"
         breadcrumbs={[
-          { label: 'Fleet Trucks', href: '/trucks' },
+          { label: 'Fleet & Trailers', href: '/trucks' },
           { label: truck.reg_number },
         ]}
         actions={
@@ -659,7 +661,7 @@ export default function TruckDetailPage() {
                     {isTripsLoading ? (
                       <tr>
                         <td colSpan={8} className="p-6 text-center text-xs text-muted-foreground">
-                          Loading trips…
+                          Loading tripsâ€¦
                         </td>
                       </tr>
                     ) : truckTrips.length === 0 ? (
@@ -677,12 +679,12 @@ export default function TruckDetailPage() {
                             </Link>
                           </td>
                           <td className="py-3 px-4">
-                            <p className="font-medium text-foreground">{trip.origin} → {trip.destination}</p>
+                            <p className="font-medium text-foreground">{trip.origin} â†’ {trip.destination}</p>
                             <p className="text-xs text-muted-foreground">{formatDate(trip.start_date)}</p>
                           </td>
                           <td className="py-3 px-4">
                             <span className="font-mono text-xs text-foreground">
-                              {trip.trailer?.reg_number ?? '—'}
+                              {trip.trailer?.reg_number ?? 'â€”'}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-foreground">{trip.driver?.name}</td>
@@ -787,7 +789,7 @@ export default function TruckDetailPage() {
                             {record.next_due_km ? ` • ${formatKm(record.next_due_km)}` : ''}
                           </td>
                           <td className="py-3 px-4 text-xs text-muted-foreground truncate max-w-xs">
-                            {record.notes || '—'}
+                            {record.notes || 'â€”'}
                           </td>
                         </tr>
                       ))
@@ -838,7 +840,7 @@ export default function TruckDetailPage() {
                               {doc.type.replace('_', ' ')}
                             </td>
                             <td className="py-3 px-4 font-mono text-xs text-foreground">
-                              {doc.document_number || '—'}
+                              {doc.document_number || 'â€”'}
                             </td>
                             <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
                               {formatDate(doc.expiry_date)}
@@ -862,7 +864,7 @@ export default function TruckDetailPage() {
                               )}
                             </td>
                             <td className="py-3 px-4 text-xs text-muted-foreground">
-                              {doc.notes || '—'}
+                              {doc.notes || 'â€”'}
                             </td>
                           </tr>
                         );
@@ -941,7 +943,7 @@ export default function TruckDetailPage() {
                     {isCouplingsLoading ? (
                       <tr>
                         <td colSpan={6} className="p-6 text-center text-xs text-muted-foreground">
-                          Loading coupling history…
+                          Loading coupling historyâ€¦
                         </td>
                       </tr>
                     ) : couplings.length === 0 ? (
@@ -970,21 +972,21 @@ export default function TruckDetailPage() {
                             {formatDate(assignment.coupled_at)}
                           </td>
                           <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                            {assignment.uncoupled_at ? formatDate(assignment.uncoupled_at) : '—'}
+                            {assignment.uncoupled_at ? formatDate(assignment.uncoupled_at) : 'â€”'}
                           </td>
                           <td className="py-3 px-4 text-right font-mono text-xs tabular-nums text-foreground">
                             {formatKm(assignment.odometer_at_couple ?? 0)}
                             {assignment.odometer_at_uncouple
-                              ? ` → ${formatKm(assignment.odometer_at_uncouple)}`
+                              ? ` â†’ ${formatKm(assignment.odometer_at_uncouple)}`
                               : ''}
                           </td>
                           <td className="py-3 px-4 text-xs text-muted-foreground max-w-xs truncate">
-                            {assignment.uncouple_reason || assignment.couple_notes || '—'}
+                            {assignment.uncouple_reason || assignment.couple_notes || 'â€”'}
                           </td>
                           <td className="py-3 px-4 text-xs text-foreground">
                             {assignment.uncoupled_by_user?.name ||
                               assignment.coupled_by_user?.name ||
-                              '—'}
+                              'â€”'}
                           </td>
                         </tr>
                       ))

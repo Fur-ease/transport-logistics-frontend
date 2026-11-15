@@ -298,6 +298,12 @@ export interface Payment {
   invoice_id: number;
   amount: number;
   method: 'cash' | 'mpesa' | 'bank';
+  bank_name?: string | null;
+  cheque_number?: string | null;
+  transaction_code?: string | null;
+  payer_name?: string | null;
+  proof_path?: string | null;
+  notes?: string | null;
   reference?: string | null;
   status?: 'valid' | 'voided';
   void_reason?: string | null;
