@@ -107,10 +107,13 @@ export interface Trip {
   total_distance_km: number;
   status: TripStatus;
   notes?: string | null;
+  is_container_trip?: boolean;
+  expected_container_count?: number | null;
   approved_expenses_total: number;
   contribution: number;
   created_at?: string;
   updated_at?: string;
+  documents?: TripDocument[];
   expenses?: TripExpense[];
   advances?: DriverAdvance[];
   invoice?: Invoice;
@@ -334,4 +337,97 @@ export interface TripsPerTruckReport {
   };
   trucks: TruckReportStat[];
 }
+
+export type TripDocumentType =
+  | 'delivery_note'
+  | 'container_interchange'
+  | 'waybill'
+  | 'bill_of_lading'
+  | 'customs_release'
+  | 'weighbridge_ticket'
+  | 'proof_of_delivery';
+
+export type TripDocumentStatus = 'pending' | 'received' | 'verified';
+export type ContainerSize = '20' | '40' | '40HC';
+export type ContainerType = 'dry' | 'reefer' | 'other';
+export type InterchangeDirection = 'out' | 'in';
+
+export interface TripDocumentFile {
+  id: number;
+  trip_document_id: number;
+  original_name: string;
+  mime_type: string;
+  size_bytes: number;
+  page_order: number;
+  replaced_by_file_id?: number | null;
+  is_current: boolean;
+  download_url: string;
+  uploaded_by?: number;
+  uploaded_at?: string;
+}
+
+export interface TripDocument {
+  id: number;
+  organization_id: number;
+  trip_id: number;
+  trip?: Trip;
+  type: TripDocumentType;
+  type_label: string;
+  document_number: string;
+  normalized_document_number: string;
+  issued_date: string;
+  status: TripDocumentStatus;
+  status_label: string;
+  notes?: string | null;
+
+  // Delivery note specific
+  receiver_name?: string | null;
+  receiver_phone?: string | null;
+  delivered_at?: string | null;
+  delivery_location?: string | null;
+  condition_notes?: string | null;
+  signed?: boolean;
+
+  // Container interchange specific
+  container_number?: string | null;
+  normalized_container_number?: string | null;
+  container_size?: ContainerSize | null;
+  container_type?: ContainerType | null;
+  seal_number?: string | null;
+  interchange_direction?: InterchangeDirection | null;
+  depot_or_terminal?: string | null;
+  interchange_datetime?: string | null;
+  free_days_end_date?: string | null;
+  iso_check_digit_overridden?: boolean;
+  iso_override_reason?: string | null;
+  duplicate_override_reason?: string | null;
+
+  // Concurrency & verification
+  version: number;
+  verified_by?: number | null;
+  verified_at?: string | null;
+  verified_by_user?: { id: number; name: string } | null;
+  created_by?: number;
+  created_by_user?: { id: number; name: string } | null;
+  created_at?: string;
+  updated_at?: string;
+
+  // Files
+  files?: TripDocumentFile[];
+  current_files?: TripDocumentFile[];
+  file_count?: number;
+}
+
+export interface StagedUploadResponse {
+  status: string;
+  data: {
+    token: string;
+    file_name: string;
+    original_name: string;
+    size_bytes: number;
+    mime_type: string;
+    sha256?: string;
+  };
+}
+
 

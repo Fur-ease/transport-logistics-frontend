@@ -66,6 +66,7 @@ export function Sidebar() {
       group: 'Analytics & Admin',
       items: [
         { label: 'Reports', href: '/reports', icon: BarChart3 },
+        { label: 'Documents Register', href: '/reports/documents', icon: FileText },
         { label: 'Settings', href: '/settings', icon: Settings },
         { label: 'Design System', href: '/design', icon: Palette },
       ],

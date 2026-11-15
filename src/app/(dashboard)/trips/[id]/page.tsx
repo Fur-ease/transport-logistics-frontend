@@ -53,8 +53,22 @@ import {
 } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { formatKES, formatKm, formatDate, formatDateTime } from '@/lib/formatters';
 import { Trip, TripExpense, DriverAdvance } from '@/types';
+import { TripDocument, TripDocumentFile, StagedUploadResponse } from '@/types';
+import { validateIso6346, normalizeContainerNumber } from '@/lib/iso6346';
+import {
+  Container,
+  ShieldCheck as ShieldCheckIcon,
+  Lock,
+  Unlock,
+  Eye,
+  Trash2,
+  Upload,
+  RotateCcw,
+  Package,
+} from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 const expenseSchema = z.object({
@@ -68,7 +82,7 @@ const expenseSchema = z.object({
     'repairs',
     'other',
   ]),
-  amount: z.number().min(1, 'Amount in KES is required'),
+  amount: z.number({ message: 'Amount in KES is required' }).min(1, 'Amount must be at least 1 KES'),
   litres: z.number().optional(),
   odometer_at_fill: z.number().optional(),
   incurred_at: z.string().min(1, 'Date and time required'),
@@ -117,6 +131,24 @@ export default function TripDetailPage() {
   const [selectedAdvance, setSelectedAdvance] = useState<DriverAdvance | null>(null);
   const [returnedAmount, setReturnedAmount] = useState<number | ''>('');
 
+  const [activeTab, setActiveTab] = useState<'overview' | 'documents'>('overview');
+  // Document state
+  const [addDocOpen, setAddDocOpen] = useState(false);
+  const [addDocType, setAddDocType] = useState<'delivery_note' | 'container_interchange'>('container_interchange');
+  const [docNumber, setDocNumber] = useState('');
+  const [docDate, setDocDate] = useState('');
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [containerNumber, setContainerNumber] = useState('');
+  const [containerSize, setContainerSize] = useState('');
+  const [containerType, setContainerType] = useState('');
+  const [sealNumber, setSealNumber] = useState('');
+  const [depotTerminal, setDepotTerminal] = useState('');
+  const [receiverName, setReceiverName] = useState('');
+  const [verifyDocId, setVerifyDocId] = useState<number | null>(null);
+  const [unlockDocId, setUnlockDocId] = useState<number | null>(null);
+  const [unlockReason, setUnlockReason] = useState('');
+  const [previewFile, setPreviewFile] = useState<TripDocumentFile | null>(null);
+
   // Fetch Trip details
   const { data: tripData, isLoading: isTripLoading } = useQuery<{ data: Trip }>({
     queryKey: ['trip', tripId],
@@ -134,6 +166,12 @@ export default function TripDetailPage() {
     queryKey: ['all-trips-select'],
     queryFn: () => api.get<{ data: Trip[] }>('/trips?per_page=100'),
   });
+
+  const { data: docsData, isLoading: isDocsLoading, refetch: refetchDocs } = useQuery<{ data: TripDocument[] }>({
+    queryKey: ['trip-documents', tripId],
+    queryFn: () => api.get<{ data: TripDocument[] }>(`/trips/${tripId}/documents`),
+  });
+  const documents = docsData?.data ?? [];
 
   const trip = tripData?.data;
   const pnl = pnlData?.data;
@@ -257,6 +295,82 @@ export default function TripDetailPage() {
     },
   });
 
+  const stageFile = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await api.upload<StagedUploadResponse>('/uploads/stage', fd);
+    return res.data.token;
+  };
+
+  const addDocMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      let token: string | undefined;
+      if (docFile) token = await stageFile(docFile);
+      return api.post(`/trips/${tripId}/documents`, {
+        ...payload,
+        ...(token ? { staged_file_token: token } : {}),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-documents', tripId] });
+      toast.success('Document added');
+      setAddDocOpen(false);
+      setDocNumber('');
+      setDocDate('');
+      setDocFile(null);
+      setContainerNumber('');
+      setContainerSize('');
+      setContainerType('');
+      setSealNumber('');
+      setDepotTerminal('');
+      setReceiverName('');
+    },
+    onError: (err: Error) => toast.error(err.message || 'Failed to add document'),
+  });
+
+  const verifyDocMutation = useMutation({
+    mutationFn: (docId: number) => api.post(`/trips/${tripId}/documents/${docId}/verify`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-documents', tripId] });
+      toast.success('Document verified and locked');
+      setVerifyDocId(null);
+    },
+    onError: (err: Error) => toast.error(err.message || 'Verification failed'),
+  });
+
+  const unlockDocMutation = useMutation({
+    mutationFn: ({ docId, reason }: { docId: number; reason: string }) =>
+      api.post(`/trips/${tripId}/documents/${docId}/unlock`, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-documents', tripId] });
+      toast.success('Document unlocked for editing');
+      setUnlockDocId(null);
+      setUnlockReason('');
+    },
+    onError: (err: Error) => toast.error(err.message || 'Unlock failed'),
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: (docId: number) => api.delete(`/trips/${tripId}/documents/${docId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-documents', tripId] });
+      toast.success('Document removed');
+    },
+    onError: (err: Error) => toast.error(err.message || 'Delete failed'),
+  });
+
+  const uploadFileMutation = useMutation({
+    mutationFn: async ({ docId, file }: { docId: number; file: File }) => {
+      const token = await stageFile(file);
+      return api.post(`/trips/${tripId}/documents/${docId}/files`, { staged_file_token: token });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-documents', tripId] });
+      toast.success('File uploaded');
+    },
+    onError: (err: Error) => toast.error(err.message || 'Upload failed'),
+  });
+
   if (isTripLoading || !trip) {
     return (
       <div className="space-y-4">
@@ -328,8 +442,38 @@ export default function TripDetailPage() {
         <TripStepper currentStatus={trip.status} />
       </Card>
 
-      {/* Core Grid: Trip Information & P&L Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-border">
+        {(['overview', 'documents'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              'px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px',
+              activeTab === tab
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {tab === 'documents' ? (
+              <span className="flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Documents
+                {documents.length > 0 && (
+                  <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                    {documents.length}
+                  </span>
+                )}
+              </span>
+            ) : (
+              'Overview'
+            )}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Details & Route */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
@@ -627,6 +771,463 @@ export default function TripDetailPage() {
           </Card>
         </div>
       </div>
+      )}
+
+      {/* Documents Tab */}
+      {activeTab === 'documents' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Trip Documents</p>
+              <p className="text-xs text-muted-foreground">
+                Delivery notes and container interchange receipts for {trip.reference}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAddDocType('container_interchange');
+                  setAddDocOpen(true);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add EIR
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAddDocType('delivery_note');
+                  setAddDocOpen(true);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Delivery Note
+              </Button>
+            </div>
+          </div>
+
+          {isDocsLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-24 w-full rounded-xl" />
+              <Skeleton className="h-24 w-full rounded-xl" />
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+              <FileText className="mx-auto h-8 w-8 mb-2 opacity-30" />
+              <p className="font-medium text-foreground">No documents uploaded yet</p>
+              <p className="text-xs mt-1">Add an Equipment Interchange Receipt (EIR) or Delivery Note (DN).</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {documents.map((doc) => {
+                const isEir = doc.type === 'container_interchange';
+                const isVerified = doc.status === 'verified';
+                const canManage = user?.role === 'owner' || user?.role === 'manager';
+
+                return (
+                  <Card key={doc.id} className={cn('border', isVerified && 'border-success/40 bg-success-bg/10')}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                              {isEir ? <Package className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                              {isEir ? 'Container Interchange (EIR)' : 'Delivery Note (DN)'}
+                            </span>
+                            <span className="font-mono text-sm font-semibold text-foreground">
+                              {doc.document_number}
+                            </span>
+                            <StatusBadge status={doc.status} />
+                            {isVerified && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-success">
+                                <ShieldCheckIcon className="h-3.5 w-3.5" />
+                                Verified
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            <p>
+                              Issued: <span className="font-medium text-foreground">{doc.issued_date}</span>
+                              {isEir && doc.container_number && (
+                                <>
+                                  {' '}· Container:{' '}
+                                  <span className="font-mono font-semibold text-foreground">
+                                    {doc.container_number}
+                                  </span>
+                                  {doc.container_size && ` (${doc.container_size}ft)`}
+                                  {doc.container_type && ` [${doc.container_type}]`}
+                                </>
+                              )}
+                              {isEir && doc.interchange_direction && (
+                                <> · Direction: <span className="font-medium capitalize text-foreground">{doc.interchange_direction === 'out' ? 'Gate-Out' : 'Gate-In'}</span></>
+                              )}
+                              {isEir && doc.depot_or_terminal && (
+                                <> · Depot: <span className="font-medium text-foreground">{doc.depot_or_terminal}</span></>
+                              )}
+                              {isEir && doc.seal_number && (
+                                <> · Seal: <span className="font-mono text-foreground">{doc.seal_number}</span></>
+                              )}
+                              {!isEir && doc.receiver_name && (
+                                <> · Receiver: <span className="font-medium text-foreground">{doc.receiver_name}</span></>
+                              )}
+                              {!isEir && doc.signed !== undefined && (
+                                <> · Signed: <span className="font-medium text-foreground">{doc.signed ? 'Yes' : 'No'}</span></>
+                              )}
+                            </p>
+                            {doc.notes && <p className="italic">Notes: {doc.notes}</p>}
+                            {doc.iso_override_reason && (
+                              <p className="text-[11px] text-warning font-medium">
+                                ISO Check Override: {doc.iso_override_reason}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Files list */}
+                          {doc.files && doc.files.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2 pt-1 border-t border-border/40">
+                              {doc.files.map((file) => (
+                                <button
+                                  key={file.id}
+                                  type="button"
+                                  onClick={() => setPreviewFile(file)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-2.5 py-1 text-xs text-foreground hover:bg-secondary transition-colors"
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span>{file.original_name}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    ({Math.round(file.size_bytes / 1024)} KB)
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Upload additional file */}
+                          {!isVerified && (
+                            <div className="pt-1">
+                              <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-primary hover:underline font-medium">
+                                <Upload className="h-3 w-3" />
+                                <span>Upload scanned copy</span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept=".pdf,.jpg,.jpeg,.png,.heic,.webp"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      uploadFileMutation.mutate({ docId: doc.id, file });
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {canManage && !isVerified && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2.5 text-xs text-success border-success/30 hover:bg-success-bg"
+                              onClick={() => setVerifyDocId(doc.id)}
+                            >
+                              <ShieldCheckIcon className="h-3.5 w-3.5 mr-1" />
+                              Verify
+                            </Button>
+                          )}
+
+                          {canManage && isVerified && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2.5 text-xs"
+                              onClick={() => setUnlockDocId(doc.id)}
+                            >
+                              <Unlock className="h-3.5 w-3.5 mr-1" />
+                              Unlock
+                            </Button>
+                          )}
+
+                          {canManage && !isVerified && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive-bg"
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to delete ${doc.document_number}?`)) {
+                                  deleteDocMutation.mutate(doc.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add Document Dialog */}
+          <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  Add {addDocType === 'container_interchange' ? 'Equipment Interchange Receipt (EIR)' : 'Delivery Note'}
+                </DialogTitle>
+                <DialogDescription>
+                  {addDocType === 'container_interchange'
+                    ? 'Record a gate-out or gate-in container interchange receipt.'
+                    : 'Record proof of delivery signed by receiver.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-2 text-xs">
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">
+                    Document Number *
+                  </label>
+                  <Input
+                    placeholder={addDocType === 'container_interchange' ? 'e.g. EIR-20241105-001' : 'e.g. DN-1042'}
+                    value={docNumber}
+                    onChange={(e) => setDocNumber(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">
+                    Issue Date *
+                  </label>
+                  <Input
+                    type="date"
+                    value={docDate}
+                    onChange={(e) => setDocDate(e.target.value)}
+                  />
+                </div>
+
+                {addDocType === 'container_interchange' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-semibold text-foreground block mb-1">
+                        Container Number
+                      </label>
+                      <Input
+                        placeholder="e.g. MSCU 123456-6"
+                        value={containerNumber}
+                        onChange={(e) => setContainerNumber(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-foreground block mb-1">Container Size</label>
+                        <select
+                          value={containerSize}
+                          onChange={(e) => setContainerSize(e.target.value)}
+                          className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="">Select size</option>
+                          <option value="20">20 ft</option>
+                          <option value="40">40 ft</option>
+                          <option value="40HC">40 ft HC</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-foreground block mb-1">Container Type</label>
+                        <select
+                          value={containerType}
+                          onChange={(e) => setContainerType(e.target.value)}
+                          className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="">Select type</option>
+                          <option value="dry">Dry</option>
+                          <option value="reefer">Reefer</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-foreground block mb-1">Seal Number</label>
+                        <Input
+                          placeholder="e.g. ML-129940"
+                          value={sealNumber}
+                          onChange={(e) => setSealNumber(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-foreground block mb-1">Depot / Terminal</label>
+                        <Input
+                          placeholder="e.g. KPA Gate 3"
+                          value={depotTerminal}
+                          onChange={(e) => setDepotTerminal(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {addDocType === 'delivery_note' && (
+                  <div>
+                    <label className="text-xs font-semibold text-foreground block mb-1">Receiver Name</label>
+                    <Input
+                      placeholder="e.g. John Mwangi"
+                      value={receiverName}
+                      onChange={(e) => setReceiverName(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">
+                    Attach Scanned Document (PDF / Image)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.heic,.webp"
+                    onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                    className="block w-full text-xs text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-secondary/80"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAddDocOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!docNumber.trim() || !docDate || addDocMutation.isPending}
+                  onClick={() => {
+                    const payload: Record<string, unknown> = {
+                      type: addDocType,
+                      document_number: docNumber.trim(),
+                      issued_date: docDate,
+                      ...(addDocType === 'container_interchange'
+                        ? {
+                            container_number: containerNumber.trim() || undefined,
+                            container_size: containerSize || undefined,
+                            container_type: containerType || undefined,
+                            seal_number: sealNumber.trim() || undefined,
+                            depot_or_terminal: depotTerminal.trim() || undefined,
+                            interchange_direction: 'out',
+                          }
+                        : {
+                            receiver_name: receiverName.trim() || undefined,
+                          }),
+                    };
+                    addDocMutation.mutate(payload);
+                  }}
+                >
+                  {addDocMutation.isPending ? 'Saving...' : 'Save Document'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Verify Dialog */}
+          <Dialog open={verifyDocId !== null} onOpenChange={() => setVerifyDocId(null)}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Verify Document</DialogTitle>
+                <DialogDescription>
+                  This verifies and locks this document. Editing and deleting will be blocked. Only an owner can unlock it.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setVerifyDocId(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={verifyDocMutation.isPending}
+                  onClick={() => verifyDocId && verifyDocMutation.mutate(verifyDocId)}
+                >
+                  {verifyDocMutation.isPending ? 'Verifying...' : 'Confirm Verify'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Unlock Dialog */}
+          <Dialog
+            open={unlockDocId !== null}
+            onOpenChange={() => {
+              setUnlockDocId(null);
+              setUnlockReason('');
+            }}
+          >
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Unlock Document</DialogTitle>
+                <DialogDescription>
+                  Provide a justification for unlocking this verified document. This action is recorded in the audit log.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-2">
+                <Input
+                  placeholder="Reason for unlocking (min 5 chars)..."
+                  value={unlockReason}
+                  onChange={(e) => setUnlockReason(e.target.value)}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setUnlockDocId(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={unlockReason.trim().length < 5 || unlockDocMutation.isPending}
+                  onClick={() => {
+                    if (unlockDocId) {
+                      unlockDocMutation.mutate({ docId: unlockDocId, reason: unlockReason });
+                    }
+                  }}
+                >
+                  {unlockDocMutation.isPending ? 'Unlocking...' : 'Unlock Document'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* File Preview Dialog */}
+          <Dialog open={previewFile !== null} onOpenChange={() => setPreviewFile(null)}>
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{previewFile?.original_name}</DialogTitle>
+              </DialogHeader>
+              {previewFile && (
+                <div className="max-h-[70vh] overflow-auto">
+                  {previewFile.mime_type?.startsWith('image/') ? (
+                    <img
+                      src={previewFile.download_url}
+                      alt={previewFile.original_name}
+                      className="w-full rounded-lg object-contain max-h-[60vh]"
+                    />
+                  ) : (
+                    <iframe
+                      src={previewFile.download_url}
+                      className="w-full h-[60vh] rounded-lg border border-border"
+                      title={previewFile.original_name}
+                    />
+                  )}
+                </div>
+              )}
+              <DialogFooter>
+                <a href={previewFile?.download_url} download target="_blank" rel="noreferrer">
+                  <Button variant="outline">Download File</Button>
+                </a>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
 
       {/* Add Expense Sheet / Drawer */}
       <Sheet open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
@@ -638,7 +1239,16 @@ export default function TripDetailPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={handleSubmit((d) => expenseMutation.mutate(d))} className="space-y-4 py-4">
+          <form
+            onSubmit={handleSubmit(
+              (d) => expenseMutation.mutate(d),
+              (errors) => {
+                const firstError = Object.values(errors)[0]?.message;
+                toast.error(firstError || 'Please fill in all required expense fields correctly');
+              }
+            )}
+            className="space-y-4 py-4"
+          >
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Expense Category</label>
               <select
@@ -658,7 +1268,14 @@ export default function TripDetailPage() {
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Amount (KES)</label>
-              <Input type="number" step="10" {...register('amount', { valueAsNumber: true })} />
+              <Input
+                type="number"
+                step="10"
+                placeholder="e.g. 5000"
+                {...register('amount', {
+                  setValueAs: (v) => (v === '' ? undefined : Number(v)),
+                })}
+              />
               {expenseErrors.amount && (
                 <p className="text-[11px] text-destructive mt-1">{expenseErrors.amount.message}</p>
               )}
@@ -669,11 +1286,30 @@ export default function TripDetailPage() {
               <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-secondary/50 border border-border">
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">Litres Filled</label>
-                  <Input type="number" step="0.1" placeholder="e.g. 150" {...register('litres', { valueAsNumber: true })} />
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g. 150"
+                    {...register('litres', {
+                      setValueAs: (v) => (v === '' ? undefined : Number(v)),
+                    })}
+                  />
+                  {expenseErrors.litres && (
+                    <p className="text-[11px] text-destructive mt-1">{expenseErrors.litres.message}</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">Odometer at Pump</label>
-                  <Input type="number" placeholder="KM" {...register('odometer_at_fill', { valueAsNumber: true })} />
+                  <Input
+                    type="number"
+                    placeholder="KM"
+                    {...register('odometer_at_fill', {
+                      setValueAs: (v) => (v === '' ? undefined : Number(v)),
+                    })}
+                  />
+                  {expenseErrors.odometer_at_fill && (
+                    <p className="text-[11px] text-destructive mt-1">{expenseErrors.odometer_at_fill.message}</p>
+                  )}
                 </div>
               </div>
             )}
@@ -681,6 +1317,9 @@ export default function TripDetailPage() {
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Date & Time Incurred</label>
               <Input type="datetime-local" {...register('incurred_at')} />
+              {expenseErrors.incurred_at && (
+                <p className="text-[11px] text-destructive mt-1">{expenseErrors.incurred_at.message}</p>
+              )}
             </div>
 
             {/* Receipt Upload with Camera Capture */}

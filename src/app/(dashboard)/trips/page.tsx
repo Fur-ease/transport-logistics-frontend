@@ -17,6 +17,14 @@ import {
   User,
   Building2,
   Calendar,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Upload,
+  Check,
+  Container,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -36,7 +44,8 @@ import {
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
 import { formatKES, formatKm, formatDate } from '@/lib/formatters';
-import { Trip, Truck as TruckType, Driver, Customer } from '@/types';
+import { validateIso6346, normalizeContainerNumber } from '@/lib/iso6346';
+import { Trip, Truck as TruckType, Driver, Customer, StagedUploadResponse } from '@/types';
 
 const tripSchema = z.object({
   truck_id: z.number().min(1, 'Please select a truck'),
@@ -113,8 +122,38 @@ export default function TripsPage() {
     }
   }, [selectedTruckId, trucksData, setValue]);
 
+  // Container & Documents state (Directive 3, 5, 6, 11)
+  const [isContainerTrip, setIsContainerTrip] = useState(false);
+  const [expectedContainers, setExpectedContainers] = useState<number>(1);
+  const [addEir, setAddEir] = useState(true);
+  const [eirNumber, setEirNumber] = useState('');
+  const [eirContainerNumber, setEirContainerNumber] = useState('');
+  const [eirSize, setEirSize] = useState<'20' | '40' | '40HC'>('40');
+  const [eirType, setEirType] = useState<'dry' | 'reefer' | 'other'>('dry');
+  const [eirSeal, setEirSeal] = useState('');
+  const [eirDepot, setEirDepot] = useState('Mombasa Port Terminal 2');
+  const [eirFile, setEirFile] = useState<File | null>(null);
+  const [eirIsoOverride, setEirIsoOverride] = useState(false);
+  const [eirIsoReason, setEirIsoReason] = useState('');
+
+  // Delivery Note collapsible state ("Add later" - Directive 6)
+  const [showDnSection, setShowDnSection] = useState(false);
+  const [dnNumber, setDnNumber] = useState('');
+  const [dnDeliveredAt, setDnDeliveredAt] = useState('');
+  const [dnReceiverName, setDnReceiverName] = useState('');
+  const [dnReceiverPhone, setDnReceiverPhone] = useState('');
+  const [dnLocation, setDnLocation] = useState('');
+  const [dnSigned, setDnSigned] = useState(false);
+  const [dnFile, setDnFile] = useState<File | null>(null);
+
+  // Live ISO 6346 validation (Directive 11)
+  const isoStatus = React.useMemo(() => {
+    if (!eirContainerNumber.trim()) return null;
+    return validateIso6346(eirContainerNumber);
+  }, [eirContainerNumber]);
+
   const createMutation = useMutation({
-    mutationFn: (newTrip: TripFormData) => api.post('/trips', newTrip),
+    mutationFn: (newTrip: any) => api.post('/trips', newTrip),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trips'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
@@ -122,14 +161,81 @@ export default function TripsPage() {
       toast.success('Trip created and dispatched successfully');
       setSheetOpen(false);
       reset();
+      setIsContainerTrip(false);
+      setEirNumber('');
+      setEirContainerNumber('');
+      setEirFile(null);
+      setDnNumber('');
+      setDnFile(null);
     },
     onError: (err: Error) => {
       toast.error(err.message || 'Failed to create trip');
     },
   });
 
-  const onSubmit = (formData: TripFormData) => {
-    createMutation.mutate(formData);
+  const stageUpload = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await api.upload<StagedUploadResponse>('/uploads/stage', fd);
+    return res.data.token;
+  };
+
+  const onSubmit = async (formData: TripFormData) => {
+    try {
+      const documents: any[] = [];
+
+      if (isContainerTrip && addEir && eirNumber.trim()) {
+        const tokens: string[] = [];
+        if (eirFile) {
+          const token = await stageUpload(eirFile);
+          tokens.push(token);
+        }
+
+        documents.push({
+          type: 'container_interchange',
+          document_number: eirNumber.trim(),
+          issued_date: formData.start_date,
+          container_number: eirContainerNumber.trim() ? normalizeContainerNumber(eirContainerNumber) : undefined,
+          container_size: eirSize,
+          container_type: eirType,
+          seal_number: eirSeal.trim() || undefined,
+          interchange_direction: 'out',
+          depot_or_terminal: eirDepot.trim() || undefined,
+          iso_check_digit_overridden: eirIsoOverride,
+          iso_override_reason: eirIsoOverride ? eirIsoReason : undefined,
+          staged_tokens: tokens,
+        });
+      }
+
+      if (showDnSection && dnNumber.trim()) {
+        const tokens: string[] = [];
+        if (dnFile) {
+          const token = await stageUpload(dnFile);
+          tokens.push(token);
+        }
+
+        documents.push({
+          type: 'delivery_note',
+          document_number: dnNumber.trim(),
+          issued_date: formData.start_date,
+          delivered_at: dnDeliveredAt || undefined,
+          receiver_name: dnReceiverName.trim() || undefined,
+          receiver_phone: dnReceiverPhone.trim() || undefined,
+          delivery_location: dnLocation.trim() || undefined,
+          signed: dnSigned,
+          staged_tokens: tokens,
+        });
+      }
+
+      createMutation.mutate({
+        ...formData,
+        is_container_trip: isContainerTrip,
+        expected_container_count: isContainerTrip ? expectedContainers : 1,
+        documents: documents.length > 0 ? documents : undefined,
+      });
+    } catch (err: any) {
+      toast.error(err.message || 'Error uploading document file');
+    }
   };
 
   return (
@@ -199,6 +305,7 @@ export default function TripsPage() {
                 <th className="py-3 px-4 text-left font-medium">Route & Dates</th>
                 <th className="py-3 px-4 text-left font-medium">Truck & Driver</th>
                 <th className="py-3 px-4 text-left font-medium">Customer & Cargo</th>
+                <th className="py-3 px-4 text-left font-medium">Documents</th>
                 <th className="py-3 px-4 text-right font-medium">Revenue (KES)</th>
                 <th className="py-3 px-4 text-right font-medium">Direct Costs</th>
                 <th className="py-3 px-4 text-right font-semibold text-success">Contribution</th>
@@ -227,6 +334,31 @@ export default function TripsPage() {
                   <td className="py-3.5 px-4">
                     <p className="font-medium text-foreground">{trip.customer?.name}</p>
                     <p className="text-xs text-muted-foreground truncate max-w-xs">{trip.cargo_description}</p>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex flex-col gap-1 text-[11px]">
+                      {trip.documents && trip.documents.length > 0 ? (
+                        trip.documents.map((d) => (
+                          <span
+                            key={d.id}
+                            className="inline-flex items-center gap-1 font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground text-[10px]"
+                          >
+                            {d.type === 'delivery_note' ? 'DN' : 'EIR'}: {d.document_number}
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                d.status === 'verified'
+                                  ? 'bg-success'
+                                  : d.status === 'received'
+                                  ? 'bg-primary'
+                                  : 'bg-warning'
+                              }`}
+                            />
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-xs italic">Pending</span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <MoneyText amount={trip.agreed_rate} size="base" />
@@ -396,6 +528,269 @@ export default function TripsPage() {
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Estimated End Date</label>
                 <Input type="date" {...register('end_date')} />
+              </div>
+            </div>
+
+            {/* Advancement D: Trip Documents & Container Section */}
+            <div className="pt-2 border-t border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Container className="h-4 w-4 text-primary" />
+                    Containerized Trip Configuration
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    Enable for shipping line container haulage requiring interchange receipts.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isContainerTrip}
+                  onChange={(e) => setIsContainerTrip(e.target.checked)}
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                />
+              </div>
+
+              {isContainerTrip && (
+                <div className="p-3.5 rounded-xl bg-secondary/50 border border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground">Expected Containers</label>
+                    <select
+                      value={expectedContainers}
+                      onChange={(e) => setExpectedContainers(Number(e.target.value))}
+                      className="h-8 px-2 rounded-lg border border-input bg-card text-xs font-semibold"
+                    >
+                      <option value={1}>1 Container (Standard)</option>
+                      <option value={2}>2 Containers (Double 20ft)</option>
+                    </select>
+                  </div>
+
+                  {/* Gate-Out EIR (Directive 6: Shown by default for container trips) */}
+                  <div className="p-3 rounded-lg bg-card border border-border space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground">Gate-Out EIR Receipt</span>
+                      <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                        Required Before Dispatch
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">EIR Document #</label>
+                        <Input
+                          placeholder="e.g. EIR-8821"
+                          value={eirNumber}
+                          onChange={(e) => setEirNumber(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Depot / Terminal</label>
+                        <Input
+                          placeholder="e.g. KPA Terminal 2"
+                          value={eirDepot}
+                          onChange={(e) => setEirDepot(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="text-[11px] font-medium text-foreground">Container Number (ISO 6346)</label>
+                        {isoStatus && (
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              isoStatus.isValid
+                                ? 'bg-success/15 text-success'
+                                : 'bg-warning/15 text-warning'
+                            }`}
+                          >
+                            {isoStatus.isValid ? 'ISO Valid ✓' : `Check digit mismatch (expected ${isoStatus.expectedCheckDigit})`}
+                          </span>
+                        )}
+                      </div>
+                      <Input
+                        placeholder="e.g. MSCU1234566"
+                        value={eirContainerNumber}
+                        onChange={(e) => setEirContainerNumber(e.target.value.toUpperCase())}
+                        className="h-8 text-xs font-mono uppercase"
+                      />
+                      {isoStatus && !isoStatus.isValid && (
+                        <div className="mt-1.5 p-2 rounded bg-warning/10 border border-warning/20 text-[11px] text-warning space-y-1">
+                          <p>{isoStatus.message}</p>
+                          <label className="flex items-center gap-1.5 cursor-pointer text-foreground font-medium">
+                            <input
+                              type="checkbox"
+                              checked={eirIsoOverride}
+                              onChange={(e) => setEirIsoOverride(e.target.checked)}
+                              className="rounded border-input text-primary focus:ring-primary"
+                            />
+                            <span>Override ISO check digit with justification note</span>
+                          </label>
+                          {eirIsoOverride && (
+                            <Input
+                              placeholder="Reason (e.g. Discrepancy on shipping line EIR paper copy)"
+                              value={eirIsoReason}
+                              onChange={(e) => setEirIsoReason(e.target.value)}
+                              className="h-7 text-[11px] bg-background mt-1"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Size</label>
+                        <select
+                          value={eirSize}
+                          onChange={(e) => setEirSize(e.target.value as any)}
+                          className="w-full h-8 px-2 rounded-lg border border-input bg-card text-xs font-mono"
+                        >
+                          <option value="20">20ft</option>
+                          <option value="40">40ft</option>
+                          <option value="40HC">40ft High Cube</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Type</label>
+                        <select
+                          value={eirType}
+                          onChange={(e) => setEirType(e.target.value as any)}
+                          className="w-full h-8 px-2 rounded-lg border border-input bg-card text-xs"
+                        >
+                          <option value="dry">Dry</option>
+                          <option value="reefer">Reefer</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Seal Number</label>
+                        <Input
+                          placeholder="SL-1029"
+                          value={eirSeal}
+                          onChange={(e) => setEirSeal(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-foreground block mb-0.5">Attach Scan / Photo (Max 10MB)</label>
+                      <input
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.heic"
+                        onChange={(e) => setEirFile(e.target.files?.[0] || null)}
+                        className="text-xs text-muted-foreground file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:opacity-90 cursor-pointer"
+                      />
+                      {eirFile && (
+                        <p className="text-[10px] text-success mt-0.5">Selected: {eirFile.name} ({(eirFile.size / 1024).toFixed(0)} KB)</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Delivery Note Collapsible (Directive 6: Add later) */}
+              <div className="p-3 rounded-xl border border-border bg-card">
+                <button
+                  type="button"
+                  onClick={() => setShowDnSection(!showDnSection)}
+                  className="w-full flex items-center justify-between text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <span className="text-xs font-bold text-foreground">Delivery Note</span>
+                      <span className="ml-2 text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+                        Typically recorded upon arrival
+                      </span>
+                    </div>
+                  </div>
+                  {showDnSection ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </button>
+
+                {showDnSection && (
+                  <div className="pt-3 mt-3 border-t border-border space-y-2.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Delivery Note #</label>
+                        <Input
+                          placeholder="e.g. DN-1042"
+                          value={dnNumber}
+                          onChange={(e) => setDnNumber(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Delivery Date/Time</label>
+                        <Input
+                          type="datetime-local"
+                          value={dnDeliveredAt}
+                          onChange={(e) => setDnDeliveredAt(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Receiver Name</label>
+                        <Input
+                          placeholder="Receiver person name"
+                          value={dnReceiverName}
+                          onChange={(e) => setDnReceiverName(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-foreground block mb-0.5">Receiver Phone</label>
+                        <Input
+                          placeholder="+2547..."
+                          value={dnReceiverPhone}
+                          onChange={(e) => setDnReceiverPhone(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-foreground block mb-0.5">Delivery Location / Warehouse</label>
+                      <Input
+                        placeholder="e.g. Bamburi Warehouse Bay 3"
+                        value={dnLocation}
+                        onChange={(e) => setDnLocation(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={dnSigned}
+                          onChange={(e) => setDnSigned(e.target.checked)}
+                          className="rounded border-input text-primary focus:ring-primary"
+                        />
+                        <span>Physical signature confirmed on delivery document</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-foreground block mb-0.5">Attach Delivery Note Scan</label>
+                      <input
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.heic"
+                        onChange={(e) => setDnFile(e.target.files?.[0] || null)}
+                        className="text-xs text-muted-foreground file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:opacity-90 cursor-pointer"
+                      />
+                      {dnFile && (
+                        <p className="text-[10px] text-success mt-0.5">Selected: {dnFile.name} ({(dnFile.size / 1024).toFixed(0)} KB)</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
