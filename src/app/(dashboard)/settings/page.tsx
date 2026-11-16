@@ -15,6 +15,12 @@ import {
   Clock,
   History,
   Plus,
+  Pencil,
+  Trash2,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -31,7 +37,7 @@ import {
   DialogFooter,
 } from '@/components/ui/Dialog';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { api } from '@/lib/api';
+import { api, ApiError, clearAuthToken } from '@/lib/api';
 import { formatDateTime } from '@/lib/formatters';
 import { User, AuditLog, Organization } from '@/types';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -48,8 +54,110 @@ type UserFormData = z.infer<typeof userSchema>;
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isOwner } = useAuth();
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
+
+  // Edit / Delete user state (owner only)
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserForm, setEditUserForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'driver' as 'owner' | 'manager' | 'accountant' | 'driver',
+    password: '',
+  });
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: typeof editUserForm }) =>
+      api.put(`/settings/users/${id}`, {
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone || null,
+        role: payload.role,
+        ...(payload.password ? { password: payload.password } : {}),
+      }),
+    onSuccess: () => {
+      toast.success('Team member updated');
+      setEditingUser(null);
+      queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to update team member');
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/settings/users/${id}`),
+    onSuccess: (res) => {
+      toast.success(res.message || 'Team member removed');
+      setDeletingUser(null);
+      queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete team member');
+    },
+  });
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const getPasswordStrength = (pw: string) => {
+    if (!pw) return { label: '', color: '', width: '0%' };
+    let score = 0;
+    if (pw.length >= 6) score++;
+    if (pw.length >= 10) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+    if (score <= 1) return { label: 'Weak', color: 'bg-rose-500 text-rose-600', width: '25%' };
+    if (score === 2) return { label: 'Fair', color: 'bg-amber-500 text-amber-600', width: '50%' };
+    if (score === 3 || score === 4) return { label: 'Good', color: 'bg-blue-500 text-blue-600', width: '75%' };
+    return { label: 'Strong', color: 'bg-emerald-500 text-emerald-600', width: '100%' };
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
+  const isSameAsCurrent = Boolean(currentPassword && newPassword && currentPassword === newPassword);
+  const passwordsMismatch = Boolean(confirmPassword && newPassword !== confirmPassword);
+  const canSubmitPassword =
+    Boolean(currentPassword) &&
+    newPassword.length >= 6 &&
+    !isSameAsCurrent &&
+    newPassword === confirmPassword;
+
+  const changePasswordMutation = useMutation({
+    mutationFn: () => {
+      setPasswordError(null);
+      return api.post<{ message: string }>('/auth/change-password', {
+        current_password: currentPassword,
+        password: newPassword,
+        password_confirmation: confirmPassword,
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(res.message || 'Password changed. Please log in again.');
+      clearAuthToken();
+      window.location.href = '/login';
+    },
+    onError: (err: unknown) => {
+      let msg = 'Failed to change password';
+      if (err instanceof ApiError && err.errors) {
+        const firstField = Object.values(err.errors)[0];
+        if (firstField && firstField[0]) msg = firstField[0];
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      setPasswordError(msg);
+      toast.error(msg);
+    },
+  });
 
   // Queries
   const { data: orgData, isLoading: isOrgLoading } = useQuery<{ data: Organization }>({
@@ -161,12 +269,13 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="organization" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto p-1">
           <TabsTrigger value="organization">Organization</TabsTrigger>
           <TabsTrigger value="users">Team &amp; Roles ({teamMembers.length})</TabsTrigger>
           <TabsTrigger value="thresholds">Alert Thresholds</TabsTrigger>
           <TabsTrigger value="data-quality">Data Quality Rules (13)</TabsTrigger>
           <TabsTrigger value="audit">System Audit Logs</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Organization Profile */}
@@ -210,6 +319,151 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Tab: Security / Change Password */}
+        <TabsContent value="security" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Change Password</CardTitle>
+              <CardDescription>
+                Update your account password. You will be signed out and asked to log in again.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="max-w-md">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (canSubmitPassword) changePasswordMutation.mutate();
+                }}
+                className="space-y-4"
+              >
+                {passwordError && (
+                  <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">Current Password</label>
+                  <div className="relative">
+                    <Input
+                      type={showCurrentPw ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Enter current password"
+                      className="pr-10"
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPw((v) => !v)}
+                      aria-label={showCurrentPw ? 'Hide current password' : 'Show current password'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                    >
+                      {showCurrentPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">New Password</label>
+                  <div className="relative">
+                    <Input
+                      type={showNewPw ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Minimum 6 characters"
+                      className="pr-10"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPw((v) => !v)}
+                      aria-label={showNewPw ? 'Hide new password' : 'Show new password'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                    >
+                      {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+
+                  {newPassword && (
+                    <div className="mt-2 space-y-1">
+                      <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${passwordStrength.color.split(' ')[0]}`}
+                          style={{ width: passwordStrength.width }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className={`font-medium ${passwordStrength.color.split(' ')[1]}`}>
+                          Strength: {passwordStrength.label}
+                        </span>
+                        {newPassword.length < 6 && (
+                          <span className="text-destructive">At least 6 characters required</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {isSameAsCurrent && (
+                    <p className="text-[11px] text-destructive mt-1">
+                      New password must be different from your current password.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">Confirm New Password</label>
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPw ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Re-enter new password"
+                      className="pr-10"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPw((v) => !v)}
+                      aria-label={showConfirmPw ? 'Hide confirm password' : 'Show confirm password'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                    >
+                      {showConfirmPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+
+                  {passwordsMismatch && (
+                    <p className="text-[11px] text-destructive mt-1">Passwords do not match.</p>
+                  )}
+                  {confirmPassword && !passwordsMismatch && newPassword.length >= 6 && !isSameAsCurrent && (
+                    <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Passwords match
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={changePasswordMutation.isPending || !canSubmitPassword}
+                >
+                  {changePasswordMutation.isPending ? 'Updating...' : 'Update Password'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Tab 2: Team Members & Roles */}
         <TabsContent value="users" className="space-y-4 mt-4">
           <Card>
@@ -220,10 +474,12 @@ export default function SettingsPage() {
                   Roles: Owner, Fleet Manager, Finance Accountant, and Field Driver
                 </CardDescription>
               </div>
-              <Button size="sm" onClick={() => setAddUserModalOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" />
-                <span>Invite Member</span>
-              </Button>
+              {isOwner && (
+                <Button size="sm" onClick={() => setAddUserModalOpen(true)}>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  <span>Invite Member</span>
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -234,6 +490,7 @@ export default function SettingsPage() {
                       <th className="py-3 px-4 text-left font-medium">Email</th>
                       <th className="py-3 px-4 text-left font-medium">Phone</th>
                       <th className="py-3 px-4 text-center font-medium">Role</th>
+                      {isOwner && <th className="py-3 px-4 text-right font-medium">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -246,12 +503,47 @@ export default function SettingsPage() {
                           <span>{m.name}</span>
                         </td>
                         <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.email}</td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.phone || 'â€”'}</td>
+                        <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.phone || '—'}</td>
                         <td className="py-3.5 px-4 text-center">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize bg-secondary text-foreground border border-border">
                             {m.role}
                           </span>
                         </td>
+                        {isOwner && (
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingUser(m);
+                                  setEditUserForm({
+                                    name: m.name,
+                                    email: m.email,
+                                    phone: m.phone || '',
+                                    role: (m.role === 'super_admin' ? 'owner' : m.role) as 'owner' | 'manager' | 'accountant' | 'driver',
+                                    password: '',
+                                  });
+                                }}
+                                title="Edit user"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={m.id === currentUser?.id}
+                                onClick={() => setDeletingUser(m)}
+                                title={m.id === currentUser?.id ? 'You cannot delete your own account' : 'Delete user'}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -527,6 +819,132 @@ export default function SettingsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog (Owner Only) */}
+      <Dialog open={Boolean(editingUser)} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Team Member</DialogTitle>
+            <DialogDescription>
+              Update member profile, role, or reset their password.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (editingUser) {
+                updateUserMutation.mutate({ id: editingUser.id, payload: editUserForm });
+              }
+            }}
+            className="space-y-4 py-2"
+          >
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">Full Name</label>
+              <Input
+                required
+                value={editUserForm.name}
+                onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">Email Address</label>
+              <Input
+                required
+                type="email"
+                value={editUserForm.email}
+                onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">Phone Number</label>
+              <Input
+                value={editUserForm.phone}
+                onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })}
+                placeholder="+2547..."
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">Assigned Role</label>
+              <select
+                value={editUserForm.role}
+                onChange={(e) =>
+                  setEditUserForm({
+                    ...editUserForm,
+                    role: e.target.value as 'owner' | 'manager' | 'accountant' | 'driver',
+                  })
+                }
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="owner">Owner (Full administrative control)</option>
+                <option value="manager">Manager (Fleet, dispatches &amp; drivers)</option>
+                <option value="accountant">Accountant (Invoices, billing &amp; advances)</option>
+                <option value="driver">Driver (Mobile camera expense submission)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-foreground block mb-1">
+                New Password <span className="text-muted-foreground font-normal">(leave blank to keep current)</span>
+              </label>
+              <Input
+                type="password"
+                minLength={6}
+                placeholder="••••••••"
+                value={editUserForm.password}
+                onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })}
+              />
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingUser(null)}
+                disabled={updateUserMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updateUserMutation.isPending}>
+                {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog (Owner Only) */}
+      <Dialog open={Boolean(deletingUser)} onOpenChange={(open) => !open && setDeletingUser(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Remove Team Member</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{deletingUser?.name}</strong> ({deletingUser?.email})? They will immediately lose access to the system.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeletingUser(null)}
+              disabled={deleteUserMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteUserMutation.isPending}
+              onClick={() => deletingUser && deleteUserMutation.mutate(deletingUser.id)}
+            >
+              {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

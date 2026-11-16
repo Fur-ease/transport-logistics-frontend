@@ -1,14 +1,41 @@
-export type UserRole = 'owner' | 'manager' | 'accountant' | 'driver';
+export type UserRole = 'super_admin' | 'owner' | 'manager' | 'accountant' | 'driver';
 
 export interface User {
   id: number;
-  organization_id: number;
+  organization_id: number | null;
   name: string;
   email: string;
   phone?: string | null;
   role: UserRole;
   driver_id?: number | null;
-  organization?: Organization;
+  organization?: Organization | null;
+}
+
+export interface SaasOrganization {
+  id: number;
+  name: string;
+  slug: string;
+  category: string;
+  currency: string;
+  timezone: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'BLOCKED' | 'LIFETIME VIP';
+  is_blocked: boolean;
+  is_lifetime_vip: boolean;
+  is_expired: boolean;
+  subscription_plan: 'Monthly' | 'Yearly' | 'Lifetime';
+  subscription_price: number;
+  subscription_expires_at: string | null;
+  users_count: number;
+  drivers_count: number;
+  trucks_count: number;
+  trips_count: number;
+  owner: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string | null;
+  } | null;
+  created_at?: string | null;
 }
 
 export interface Organization {
