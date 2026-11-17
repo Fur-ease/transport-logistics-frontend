@@ -22,6 +22,11 @@ import {
   Activity,
   AlertTriangle,
   Ban,
+  Filter,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -91,6 +96,14 @@ export default function SuperAdminPage() {
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [planFilter, setPlanFilter] = useState<string>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [dateField, setDateField] = useState<'created_at' | 'subscription_expires_at'>('created_at');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [showFilters, setShowFilters] = useState<boolean>(true);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(5);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   // Modals
@@ -163,9 +176,23 @@ export default function SuperAdminPage() {
 
   const organizations = useMemo(() => data?.data ?? [], [data]);
 
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    organizations.forEach((o) => {
+      if (o.category) set.add(o.category);
+    });
+    return Array.from(set).sort();
+  }, [organizations]);
+
   const filteredOrgs = useMemo(() => {
+    const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toMs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
+
     return organizations.filter((org) => {
       const matchesStatus = statusFilter === 'ALL' || org.status === statusFilter;
+      const matchesPlan = planFilter === 'ALL' || org.subscription_plan === planFilter;
+      const matchesCategory = categoryFilter === 'ALL' || org.category === categoryFilter;
+
       const q = search.trim().toLowerCase();
       const matchesSearch =
         !q ||
@@ -173,9 +200,93 @@ export default function SuperAdminPage() {
         org.category.toLowerCase().includes(q) ||
         (org.owner?.name?.toLowerCase().includes(q) ?? false) ||
         (org.owner?.email?.toLowerCase().includes(q) ?? false);
-      return matchesStatus && matchesSearch;
+
+      let matchesDate = true;
+      if (fromMs !== null || toMs !== null) {
+        const rawDate = dateField === 'created_at' ? org.created_at : org.subscription_expires_at;
+        if (!rawDate) {
+          matchesDate = false;
+        } else {
+          const targetMs = new Date(rawDate).getTime();
+          if (fromMs !== null && targetMs < fromMs) matchesDate = false;
+          if (toMs !== null && targetMs > toMs) matchesDate = false;
+        }
+      }
+
+      return matchesStatus && matchesPlan && matchesCategory && matchesSearch && matchesDate;
     });
-  }, [organizations, statusFilter, search]);
+  }, [organizations, statusFilter, planFilter, categoryFilter, search, dateField, dateFrom, dateTo]);
+
+  // Reset to page 1 when filters/search/pageSize change
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, planFilter, categoryFilter, search, dateField, dateFrom, dateTo, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrgs.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedOrgs = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredOrgs.slice(start, start + pageSize);
+  }, [filteredOrgs, safePage, pageSize]);
+
+  const hasActiveFilters =
+    statusFilter !== 'ALL' ||
+    planFilter !== 'ALL' ||
+    categoryFilter !== 'ALL' ||
+    Boolean(search.trim()) ||
+    Boolean(dateFrom) ||
+    Boolean(dateTo);
+
+  const clearAllFilters = () => {
+    setSearch('');
+    setStatusFilter('ALL');
+    setPlanFilter('ALL');
+    setCategoryFilter('ALL');
+    setDateFrom('');
+    setDateTo('');
+    setPage(1);
+  };
+
+  const applyDatePreset = (preset: 'all' | 'today' | 'last7' | 'last30' | 'expiring7') => {
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
+
+    if (preset === 'all') {
+      setDateFrom('');
+      setDateTo('');
+      return;
+    }
+    if (preset === 'today') {
+      setDateField('created_at');
+      const s = fmt(today);
+      setDateFrom(s);
+      setDateTo(s);
+      return;
+    }
+    if (preset === 'last7') {
+      setDateField('created_at');
+      const from = new Date(today);
+      from.setDate(today.getDate() - 7);
+      setDateFrom(fmt(from));
+      setDateTo(fmt(today));
+      return;
+    }
+    if (preset === 'last30') {
+      setDateField('created_at');
+      const from = new Date(today);
+      from.setDate(today.getDate() - 30);
+      setDateFrom(fmt(from));
+      setDateTo(fmt(today));
+      return;
+    }
+    if (preset === 'expiring7') {
+      setDateField('subscription_expires_at');
+      const to = new Date(today);
+      to.setDate(today.getDate() + 7);
+      setDateFrom(fmt(today));
+      setDateTo(fmt(to));
+    }
+  };
 
   const stats = useMemo(() => {
     return {
@@ -184,6 +295,7 @@ export default function SuperAdminPage() {
       expired: organizations.filter((o) => o.status === 'EXPIRED').length,
       blocked: organizations.filter((o) => o.status === 'BLOCKED').length,
       vip: organizations.filter((o) => o.status === 'LIFETIME VIP').length,
+      totalStaff: organizations.reduce((acc, o) => acc + (o.users_count || 0), 0),
     };
   }, [organizations]);
 
@@ -311,7 +423,7 @@ export default function SuperAdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] text-slate-900">
+    <div className="min-h-screen flex flex-col bg-[#F5F7FA] text-slate-900">
       {/* Top Header matching SaaS Control Center */}
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-3">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
@@ -367,7 +479,7 @@ export default function SuperAdminPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
         {/* Stats Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
@@ -393,33 +505,162 @@ export default function SuperAdminPage() {
           ))}
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-          <div className="relative flex-1">
-            <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search company, owner name, or email..."
-              className="pl-9 bg-white border-slate-200"
-            />
+        {/* Search & Filters */}
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+            <div className="relative flex-1">
+              <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search company, owner name, or email..."
+                className="pl-9 bg-white border-slate-200"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters((v) => !v)}
+                className={`gap-1.5 bg-white ${showFilters ? 'border-emerald-500 text-emerald-700' : ''}`}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                Filters
+              </Button>
+
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="gap-1 text-rose-600 border-rose-200 hover:bg-rose-50 bg-white"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear
+                </Button>
+              )}
+
+              <Button
+                onClick={() => setAddModalOpen(true)}
+                className="sm:hidden bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+              >
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
           </div>
-          <Button
-            onClick={() => setAddModalOpen(true)}
-            className="sm:hidden bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-          >
-            <Plus className="h-4 w-4" /> Add Company & Owner
-          </Button>
+
+          {showFilters && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">Plan</label>
+                  <select
+                    value={planFilter}
+                    onChange={(e) => setPlanFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="ALL">All Plans</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Yearly">Yearly</option>
+                    <option value="Lifetime">Lifetime</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">Category</label>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="ALL">All Categories</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">Date Field</label>
+                  <select
+                    value={dateField}
+                    onChange={(e) =>
+                      setDateField(e.target.value as 'created_at' | 'subscription_expires_at')
+                    }
+                    className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="created_at">Created Date</option>
+                    <option value="subscription_expires_at">Expiry Date</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">From Date</label>
+                  <div className="relative">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">To Date</label>
+                  <div className="relative">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
+                <span className="text-[11px] font-medium text-slate-400 mr-1">Quick dates:</span>
+                {[
+                  { key: 'all', label: 'All Time' },
+                  { key: 'today', label: 'Created Today' },
+                  { key: 'last7', label: 'Last 7 Days' },
+                  { key: 'last30', label: 'Last 30 Days' },
+                  { key: 'expiring7', label: 'Expiring in 7 Days' },
+                ].map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() =>
+                      applyDatePreset(
+                        preset.key as 'all' | 'today' | 'last7' | 'last30' | 'expiring7'
+                      )
+                    }
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Organization Cards */}
         <div className="space-y-4">
-          {filteredOrgs.length === 0 ? (
+          {paginatedOrgs.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-500 text-sm">
               No companies match your filter.
             </div>
           ) : (
-            filteredOrgs.map((org, idx) => {
+            paginatedOrgs.map((org, idx) => {
               const countdown = formatCountdown(
                 org.subscription_expires_at,
                 org.is_lifetime_vip,
@@ -659,7 +900,113 @@ export default function SuperAdminPage() {
             })
           )}
         </div>
+
+        {/* Pagination Bar */}
+        {filteredOrgs.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-3">
+              <span>
+                Showing{' '}
+                <strong>{(safePage - 1) * pageSize + 1}</strong>–
+                <strong>{Math.min(safePage * pageSize, filteredOrgs.length)}</strong> of{' '}
+                <strong>{filteredOrgs.length}</strong>{' '}
+                {filteredOrgs.length === 1 ? 'company' : 'companies'}
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  {[5, 10, 20, 50].map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Prev
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('ellipsis');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((item, idx) =>
+                  item === 'ellipsis' ? (
+                    <span key={`e-${idx}`} className="px-1.5 text-slate-400">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPage(item)}
+                      className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-semibold transition-colors ${
+                        item === safePage
+                          ? 'bg-emerald-600 text-white'
+                          : 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+
+              <button
+                type="button"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* SaaS Control Center Footer */}
+      <footer className="bg-white border-t border-slate-200 px-4 sm:px-6 py-4 mt-8">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-emerald-600 flex items-center justify-center text-white">
+              <ShieldCheck className="h-3.5 w-3.5" />
+            </div>
+            <span className="font-semibold text-slate-700">HaulTrack SaaS Control Center</span>
+            <span className="text-slate-300">•</span>
+            <span>Platform Admin</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span>
+              <strong>{stats.active + stats.vip}</strong> Accessible / <strong>{stats.total}</strong> Companies
+            </span>
+            <span className="text-slate-300">•</span>
+            <span>
+              <strong>{stats.totalStaff}</strong> Total Staff
+            </span>
+            <span className="text-slate-300">•</span>
+            <span>© {new Date().getFullYear()} HaulTrack</span>
+          </div>
+        </div>
+      </footer>
 
       {/* Add Company & Owner Modal */}
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>

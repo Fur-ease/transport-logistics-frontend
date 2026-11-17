@@ -142,6 +142,8 @@ export interface Customer {
   name: string;
   phone: string;
   email?: string | null;
+  physical_address?: string | null;
+  po_box?: string | null;
   payment_terms_days: number;
   version?: number;
   total_trips?: number;
@@ -157,6 +159,7 @@ export interface Customer {
   };
   invoices?: Invoice[];
   trips?: Trip[];
+  created_at?: string | null;
 }
 
 export type TripStatus = 'planned' | 'in_transit' | 'delivered' | 'invoiced' | 'paid' | 'cancelled';
