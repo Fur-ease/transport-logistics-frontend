@@ -17,6 +17,8 @@ import {
   Receipt,
   Palette,
   ShieldCheck,
+  ShieldAlert,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -45,6 +47,7 @@ export function Sidebar() {
       items: [
         { label: 'Dashboard', href: '/', icon: LayoutDashboard },
         { label: 'Trips & Dispatch', href: '/trips', icon: MapPin },
+        { label: 'Missing Entries', href: '/operations/missing-entries', icon: ShieldAlert },
         { label: 'Driver Portal', href: '/driver', icon: Receipt },
       ],
     },
@@ -65,6 +68,7 @@ export function Sidebar() {
     {
       group: 'Analytics & Admin',
       items: [
+        { label: 'Trip Profit Sheet', href: '/reports/trip-profit', icon: FileSpreadsheet },
         { label: 'Reports', href: '/reports', icon: BarChart3 },
         { label: 'Documents Register', href: '/reports/documents', icon: FileText },
         { label: 'Settings', href: '/settings', icon: Settings },

@@ -1,4 +1,5 @@
 'use client';
+import { syncFinancialState } from '@/lib/liveSync';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -67,18 +68,12 @@ export default function DriversPage() {
     formState: { errors },
   } = useForm<DriverFormData>({
     resolver: zodResolver(driverSchema),
-    defaultValues: {
-      status: 'active',
-      licence_expiry: new Date(new Date().setFullYear(new Date().getFullYear() + 2))
-        .toISOString()
-        .split('T')[0],
-    },
   });
 
   const createMutation = useMutation({
     mutationFn: (newDriver: DriverFormData) => api.post('/drivers', newDriver),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Driver registered successfully');
       setSheetOpen(false);
       reset();

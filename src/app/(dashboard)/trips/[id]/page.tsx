@@ -4,12 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   MapPin,
-  Truck,
   User,
   Building2,
   Calendar,
@@ -24,6 +23,8 @@ import {
   Receipt,
   FileCheck,
   ArrowRight,
+  Edit3,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -32,6 +33,11 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { MoneyText } from '@/components/shared/MoneyText';
 import { FileUpload } from '@/components/shared/FileUpload';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { EditTripSheet } from '@/components/shared/EditTripSheet';
+import { EditExpenseDialog } from '@/components/shared/EditExpenseDialog';
+import { AdvanceAdjustmentDialog } from '@/components/shared/AdvanceAdjustmentDialog';
+import { HistoryTimeline } from '@/components/shared/HistoryTimeline';
+import { CategorySelect } from '@/components/shared/CategorySelect';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -52,10 +58,11 @@ import {
   SheetFooter,
 } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { api } from '@/lib/api';
+import { api, getFileUrl, openProtectedFile } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { formatKES, formatKm, formatDate, formatDateTime } from '@/lib/formatters';
-import { Trip, TripExpense, DriverAdvance } from '@/types';
+import { LIVE_REFETCH_MS, syncFinancialState } from '@/lib/liveSync';
+import { Trip, TripExpense, DriverAdvance, Truck, Driver, Customer } from '@/types';
 import { TripDocument, TripDocumentFile, StagedUploadResponse } from '@/types';
 import { validateIso6346, normalizeContainerNumber } from '@/lib/iso6346';
 import {
@@ -72,21 +79,16 @@ import {
 import { useAuth } from '@/components/providers/AuthProvider';
 
 const expenseSchema = z.object({
-  category: z.enum([
-    'fuel',
-    'allowance',
-    'toll',
-    'county_levy_cess',
-    'border_fees',
-    'loading_offloading',
-    'repairs',
-    'other',
-  ]),
-  amount: z.number({ message: 'Amount in KES is required' }).min(1, 'Amount must be at least 1 KES'),
-  litres: z.number().optional(),
-  odometer_at_fill: z.number().optional(),
+  category: z
+    .string({ message: 'Expense category is required' })
+    .min(1, 'Expense category is required')
+    .max(50, 'Category is too long')
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _\/&-]*$/, 'Invalid category name'),
+  amount: z.number({ error: 'Amount in KES is required' }{ message: 'Amount in KES is required' }).min(1, 'Amount must be at least 1 KES'),
+  litres: z.number().optional().nullable(),
+  odometer_at_fill: z.number().optional().nullable(),
   incurred_at: z.string().min(1, 'Date and time required'),
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(),
 });
 
 type ExpenseFormData = z.infer<typeof expenseSchema>;
@@ -114,7 +116,20 @@ export default function TripDetailPage() {
   const { user } = useAuth();
 
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<File | null>(null);
+  const [selectedReceipts, setSelectedReceipts] = useState<File[]>([]);
+
+  const openAddExpenseModal = () => {
+    resetExpenseForm({
+      category: '',
+      amount: undefined as unknown as number,
+      incurred_at: '',
+      litres: undefined,
+      odometer_at_fill: undefined,
+      notes: '',
+    });
+    setSelectedReceipts([]);
+    setAddExpenseOpen(true);
+  };
 
   // Reassign modal state
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
@@ -149,17 +164,56 @@ export default function TripDetailPage() {
   const [unlockReason, setUnlockReason] = useState('');
   const [previewFile, setPreviewFile] = useState<TripDocumentFile | null>(null);
 
+  // Safe editing states
+  const [editTripSheetOpen, setEditTripSheetOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<TripExpense | null>(null);
+  const [adjustingAdvance, setAdjustingAdvance] = useState<DriverAdvance | null>(null);
+  const [activeBottomTab, setActiveBottomTab] = useState<'expenses' | 'history'>('expenses');
+
   // Fetch Trip details
-  const { data: tripData, isLoading: isTripLoading } = useQuery<{ data: Trip }>({
+  const {
+    data: tripData,
+    isLoading: isTripLoading,
+    isFetching: isTripFetching,
+    refetch: refetchTrip,
+    dataUpdatedAt: tripUpdatedAt,
+  } = useQuery<{ data: Trip }>({
     queryKey: ['trip', tripId],
     queryFn: () => api.get<{ data: Trip }>(`/trips/${tripId}`),
+    refetchInterval: LIVE_REFETCH_MS,
+  });
+
+  // Fetch fleet options for edit sheet
+  const { data: trucksData } = useQuery<{ data: Truck[] }>({
+    queryKey: ['trucks-select'],
+    queryFn: () => api.get<{ data: Truck[] }>('/trucks', { per_page: 100 }),
+  });
+  const { data: activeTripsData } = useQuery<{ data: Trip[] }>({
+    queryKey: ['active-trips-select'],
+    queryFn: () => api.get<{ data: Trip[] }>('/trips', { status: 'active', per_page: 100 }),
+  });
+  const { data: driversData } = useQuery<{ data: Driver[] }>({
+    queryKey: ['drivers-select'],
+    queryFn: () => api.get<{ data: Driver[] }>('/drivers'),
+  });
+  const { data: customersData } = useQuery<{ data: Customer[] }>({
+    queryKey: ['customers-select'],
+    queryFn: () => api.get<{ data: Customer[] }>('/customers'),
   });
 
   // Fetch Trip P&L
-  const { data: pnlData, isLoading: isPnlLoading } = useQuery<{ data: TripPnLResponse }>({
+  const { data: pnlData, isLoading: isPnlLoading, refetch: refetchPnl } = useQuery<{ data: TripPnLResponse }>({
     queryKey: ['trip-pnl', tripId],
     queryFn: () => api.get<{ data: TripPnLResponse }>(`/trips/${tripId}/pnl`),
+    refetchInterval: LIVE_REFETCH_MS,
   });
+
+  // Advancement C: Missing entries query for this trip
+  const { data: tripIssuesResponse } = useQuery<{ data: Array<{ id: number; rule_key: string }> }>({
+    queryKey: ['trip-issues', tripId],
+    queryFn: () => api.get(`/missing-entries?trip_id=${tripId}&status=open`),
+  });
+  const tripIssues = tripIssuesResponse?.data || [];
 
   // Fetch all trips list for reassignment target select
   const { data: allTripsData } = useQuery<{ data: Trip[] }>({
@@ -182,13 +236,16 @@ export default function TripDetailPage() {
     handleSubmit,
     reset: resetExpenseForm,
     watch,
+    control,
+    setValue,
     formState: { errors: expenseErrors },
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      category: 'fuel',
-      incurred_at: new Date().toISOString().slice(0, 16),
-      amount: 10000,
+      category: '',
+      amount: undefined as unknown as number,
+      incurred_at: '',
+      notes: '',
     },
   });
 
@@ -200,22 +257,32 @@ export default function TripDetailPage() {
       const data = new FormData();
       data.append('category', formData.category);
       data.append('amount', String(formData.amount));
-      if (formData.litres) data.append('litres', String(formData.litres));
-      if (formData.odometer_at_fill) data.append('odometer_at_fill', String(formData.odometer_at_fill));
-      data.append('incurred_at', formData.incurred_at);
+      if (formData.litres !== undefined && formData.litres !== null && !isNaN(formData.litres)) {
+        data.append('litres', String(formData.litres));
+      }
+      if (formData.odometer_at_fill !== undefined && formData.odometer_at_fill !== null && !isNaN(formData.odometer_at_fill)) {
+        data.append('odometer_at_fill', String(formData.odometer_at_fill));
+      }
+      // send as ISO instant so stored/displayed time matches the selected local date & time
+      data.append('incurred_at', new Date(formData.incurred_at).toISOString());
       if (formData.notes) data.append('notes', formData.notes);
-      if (selectedReceipt) data.append('receipt', selectedReceipt);
+      selectedReceipts.forEach((file) => data.append('receipts[]', file));
 
       return api.upload(`/trips/${tripId}/expenses`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Expense recorded successfully');
       setAddExpenseOpen(false);
-      resetExpenseForm();
-      setSelectedReceipt(null);
+      resetExpenseForm({
+        category: undefined as unknown as ExpenseFormData['category'],
+        amount: undefined as unknown as number,
+        incurred_at: '',
+        litres: undefined,
+        odometer_at_fill: undefined,
+        notes: '',
+      });
+      setSelectedReceipts([]);
     },
     onError: (err: Error) => {
       toast.error(err.message || 'Failed to submit expense');
@@ -226,9 +293,8 @@ export default function TripDetailPage() {
   const expenseStatusMutation = useMutation({
     mutationFn: ({ expenseId, status, reason }: { expenseId: number; status: string; reason?: string }) =>
       api.patch(`/expenses/${expenseId}/status`, { status, rejection_reason: reason }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Expense status updated');
     },
   });
@@ -237,9 +303,8 @@ export default function TripDetailPage() {
   const reassignMutation = useMutation({
     mutationFn: ({ expenseId, targetTripId, reason }: { expenseId: number; targetTripId: number; reason: string }) =>
       api.post(`/expenses/${expenseId}/reassign`, { target_trip_id: targetTripId, reason }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Expense reassigned and logged in audit trail');
       setReassignModalOpen(false);
       setExpenseToReassign(null);
@@ -254,11 +319,8 @@ export default function TripDetailPage() {
   const tripStatusMutation = useMutation({
     mutationFn: (updates: { status: string; end_odometer?: number; end_date?: string }) =>
       api.put(`/trips/${tripId}`, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trip-pnl', tripId] });
-      queryClient.invalidateQueries({ queryKey: ['trips'] });
-      queryClient.invalidateQueries({ queryKey: ['trucks'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Trip status updated');
       setDeliveredModalOpen(false);
     },
@@ -271,8 +333,8 @@ export default function TripDetailPage() {
   const settleAdvanceMutation = useMutation({
     mutationFn: ({ advanceId, returned }: { advanceId: number; returned: number }) =>
       api.post(`/advances/${advanceId}/settle`, { amount_returned: returned }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Driver advance settlement updated');
       setSettleModalOpen(false);
       setSelectedAdvance(null);
@@ -286,8 +348,8 @@ export default function TripDetailPage() {
   // Create invoice mutation
   const createInvoiceMutation = useMutation({
     mutationFn: () => api.post('/invoices', { trip_id: Number(tripId) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Invoice generated for customer');
     },
     onError: (err: Error) => {
@@ -384,14 +446,29 @@ export default function TripDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${trip.reference} — ${trip.origin} to ${trip.destination}`}
-        description={`${trip.customer?.name} • Cargo: ${trip.cargo_description} (${trip.cargo_weight_tons} tons) • Rate: ${formatKES(trip.agreed_rate)}`}
+        title={
+          <span>{trip.reference} {trip.origin} to {trip.destination}</span>
+        }
+        description={
+          <p className="text-sm md:text-base font-medium text-foreground mt-1 max-w-3xl">
+            {trip.customer?.name} • Cargo: {trip.cargo_description} ({trip.cargo_weight_tons} tons) • Rate: {formatKES(trip.agreed_rate)}
+          </p>
+        }
         breadcrumbs={[
           { label: 'Trips & Dispatch', href: '/trips' },
           { label: trip.reference },
         ]}
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="bg-sky-100 text-sky-800 hover:bg-sky-200 border border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800 dark:hover:bg-sky-900/60"
+              onClick={() => setEditTripSheetOpen(true)}
+            >
+              <Edit3 className="mr-1.5 h-4 w-4" />
+              <span>Edit Details</span>
+            </Button>
             {trip.status === 'planned' && (
               <Button
                 size="sm"
@@ -426,9 +503,9 @@ export default function TripDetailPage() {
             )}
 
             <Button
-              variant="outline"
+              variant="success"
               size="sm"
-              onClick={() => setAddExpenseOpen(true)}
+              onClick={openAddExpenseModal}
             >
               <Plus className="mr-1.5 h-4 w-4" />
               <span>Add Expense</span>
@@ -436,6 +513,47 @@ export default function TripDetailPage() {
           </div>
         }
       />
+
+      <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+          </span>
+          Live trip P&L · auto-refresh every 15s
+          {tripUpdatedAt ? ` · updated ${new Date(tripUpdatedAt).toLocaleTimeString()}` : ''}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            refetchTrip();
+            refetchPnl();
+          }}
+          className="h-7 px-2 text-[11px]"
+          disabled={isTripFetching}
+        >
+          <RefreshCw className={`mr-1 h-3 w-3 ${isTripFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Advancement C: Missing entries warning banner */}
+      {tripIssues.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              <strong>Data Quality Warning:</strong> {tripIssues.length} entry issue{tripIssues.length > 1 ? 's' : ''} detected on this trip. Profit sheet calculations may be incomplete.
+            </span>
+          </div>
+          <Button asChild size="sm" variant="outline" className="border-amber-500/40 hover:bg-amber-500/10 shrink-0 h-7 text-xs">
+            <Link href={`/operations/missing-entries?trip_id=${tripId}&status=open`}>
+              <span>Review &amp; Fix</span>
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Stepper tracking Trip Lifecycle */}
       <Card className="p-4 bg-card">
@@ -474,303 +592,446 @@ export default function TripDetailPage() {
 
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Details & Route */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center justify-between">
-                <span>Dispatch Summary</span>
-                <StatusBadge status={trip.status} />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                <div className="p-3 rounded-lg bg-secondary/50 border border-border">
-                  <span className="text-muted-foreground block text-[11px] mb-1">Truck Assigned</span>
-                  <Link href={`/trucks/${trip.truck_id}`} className="font-mono font-bold text-sm text-primary hover:underline">
-                    {trip.truck?.reg_number}
-                  </Link>
-                  <p className="text-muted-foreground mt-0.5">{trip.truck?.make} {trip.truck?.model}</p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-secondary/50 border border-border">
-                  <span className="text-muted-foreground block text-[11px] mb-1">Driver</span>
-                  <p className="font-semibold text-sm text-foreground">{trip.driver?.name}</p>
-                  <p className="text-muted-foreground mt-0.5">{trip.driver?.phone}</p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-secondary/50 border border-border">
-                  <span className="text-muted-foreground block text-[11px] mb-1">Customer</span>
-                  <p className="font-semibold text-sm text-foreground">{trip.customer?.name}</p>
-                  <p className="text-muted-foreground mt-0.5">{trip.customer?.phone}</p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-secondary/50 border border-border">
-                  <span className="text-muted-foreground block text-[11px] mb-1">Distance Logged</span>
-                  <p className="font-mono font-bold text-sm text-foreground tabular-nums">
-                    {formatKm(trip.total_distance_km)}
-                  </p>
-                  <p className="text-muted-foreground mt-0.5 font-mono text-[11px]">
-                    {trip.start_odometer} → {trip.end_odometer ?? '...'}
-                  </p>
-                </div>
-              </div>
-
-              {trip.notes && (
-                <div className="mt-4 p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
-                  <strong>Notes:</strong> {trip.notes}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Itemised Trip Expenses Section */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-base">Trip Direct Expenses</CardTitle>
-                <CardDescription>
-                  Fuel, driver per diems, tolls, cess, and emergency repairs incurred on this trip
-                </CardDescription>
-              </div>
-              <Button size="sm" onClick={() => setAddExpenseOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" />
-                <span>Add Expense</span>
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
-                    <tr>
-                      <th className="py-2.5 px-4 text-left font-medium">Category</th>
-                      <th className="py-2.5 px-4 text-left font-medium">Details / Fuel Analysis</th>
-                      <th className="py-2.5 px-4 text-right font-medium">Amount</th>
-                      <th className="py-2.5 px-4 text-center font-medium">Status</th>
-                      <th className="py-2.5 px-4 text-right font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {trip.expenses?.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="p-6 text-center text-xs text-muted-foreground">
-                          No direct expenses recorded yet for this trip.
-                        </td>
-                      </tr>
-                    ) : (
-                      trip.expenses?.map((exp) => (
-                        <tr key={exp.id} className="hover:bg-muted/40 transition-colors">
-                          <td className="py-3 px-4">
-                            <span className="font-semibold text-foreground capitalize block">
-                              {exp.category.replace(/_/g, ' ')}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {formatDateTime(exp.incurred_at)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-xs">
-                            {exp.category === 'fuel' && exp.litres ? (
-                              <div className="space-y-1">
-                                <span className="font-mono text-muted-foreground">
-                                  {exp.litres} L @ Odo {exp.odometer_at_fill || 'N/A'}
-                                </span>
-                                {exp.fuel_analysis && exp.fuel_analysis.is_anomaly && (
-                                  <div className="flex items-center gap-1 text-[11px] font-bold text-destructive">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                    <span>
-                                      Anomaly: {exp.fuel_analysis.km_per_litre} km/L ({exp.fuel_analysis.deviation_pct}% below rolling avg)
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                Entered by {exp.entered_by_name || 'Staff'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right font-mono font-semibold">
-                            <MoneyText amount={exp.amount} size="base" />
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <StatusBadge status={exp.status} />
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {exp.status === 'pending' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success-bg"
-                                    onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'approved' })}
-                                  >
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive-bg"
-                                    onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'rejected', reason: 'Disallowed by accountant' })}
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-
-                              {/* Reassign Misassigned Expense to Another Trip */}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                onClick={() => {
-                                  setExpenseToReassign(exp);
-                                  setReassignModalOpen(true);
-                                }}
-                                title="Reassign to another trip"
-                              >
-                                <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                                Reassign
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right 1 Col: Trip P&L Card & Driver Advance Settlement */}
-        <div className="space-y-6">
-          {/* Official Trip P&L Card */}
-          <Card className="border-primary/30">
-            <CardHeader className="bg-primary/5 pb-3 border-b border-border">
-              <CardTitle className="text-base text-primary flex items-center justify-between">
-                <span>Trip Financial P&L</span>
-                <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-primary text-white">
-                  Contribution
-                </span>
-              </CardTitle>
-              <CardDescription>
-                Live revenue vs approved direct expense reconciliation
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-5 space-y-4 text-xs">
-              {/* Agreed Rate */}
-              <div className="flex items-center justify-between py-2 border-b border-border/60">
-                <span className="text-muted-foreground font-medium">Agreed Revenue Rate</span>
-                <MoneyText amount={pnl?.revenue ?? trip.agreed_rate} size="lg" />
-              </div>
-
-              {/* Direct Expenses Breakdown */}
-              <div className="space-y-2 py-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                  Approved Direct Expenses
-                </span>
-                {pnl?.breakdown_by_category && (
-                  Object.entries(pnl.breakdown_by_category).map(([cat, amt]) => {
-                    if (amt <= 0) return null;
-                    return (
-                      <div key={cat} className="flex justify-between text-muted-foreground">
-                        <span className="capitalize">{cat.replace(/_/g, ' ')}</span>
-                        <MoneyText amount={amt} size="sm" />
-                      </div>
-                    );
-                  })
-                )}
-                <div className="flex justify-between font-semibold text-destructive pt-2 border-t border-border/40">
-                  <span>Total Direct Costs</span>
-                  <MoneyText amount={pnl?.approved_direct_costs ?? 0} variant="negative" size="base" />
-                </div>
-              </div>
-
-              {/* Contribution Highlight Box */}
-              <div className="p-4 rounded-xl bg-success-bg/80 border border-success/30 text-success-foreground space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase font-bold tracking-wider">Trip Contribution</span>
-                  <span className="font-mono text-xl font-bold">
-                    {formatKES(pnl?.contribution ?? trip.contribution)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-success font-medium">
-                  <span>Contribution Margin</span>
-                  <span>{pnl?.contribution_margin_pct ?? 0}%</span>
-                </div>
-              </div>
-
-              {/* Mandatory East African Transporter Disclaimer */}
-              <div className="p-3 rounded-lg bg-secondary/80 border border-border text-[11px] text-muted-foreground leading-relaxed">
-                <strong>Accounting Note:</strong> Contribution reflects revenue minus approved direct haulage costs. Shared fleet overheads (insurance, yard rent, finance interest) are excluded.
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Driver Advance Settlement Panel */}
-          <Card>
-            <CardHeader className="pb-3 border-b border-border">
-              <CardTitle className="text-base flex items-center justify-between">
-                <span>Driver Advance Trail</span>
-                {trip.advances && trip.advances[0] && (
-                  <StatusBadge status={trip.advances[0].status} />
-                )}
-              </CardTitle>
-              <CardDescription>
-                Settlement trail: advance given → accepted expenses → returned balance
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-5 text-xs space-y-3">
-              {trip.advances && trip.advances.length > 0 ? (
-                trip.advances.map((adv) => (
-                  <div key={adv.id} className="space-y-3">
-                    <div className="flex justify-between py-1.5 border-b border-border/50">
-                      <span className="text-muted-foreground">1. Cash Advance Given</span>
-                      <MoneyText amount={adv.amount_given} size="base" />
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-border/50">
-                      <span className="text-muted-foreground">2. Expenses Accepted</span>
-                      <MoneyText amount={adv.expenses_accepted} size="base" />
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-border/50">
-                      <span className="text-muted-foreground">3. Cash Returned</span>
-                      <MoneyText amount={adv.amount_returned} size="base" />
-                    </div>
-                    <div className="flex justify-between py-2 font-bold text-foreground">
-                      <span>Unsettled Balance Due</span>
-                      <MoneyText
-                        amount={adv.balance_remaining}
-                        variant={adv.balance_remaining > 0 ? 'negative' : 'positive'}
-                        size="base"
-                      />
-                    </div>
-
-                    {adv.status === 'open' && (
-                      <Button
-                        size="sm"
-                        className="w-full mt-2"
-                        onClick={() => {
-                          setSelectedAdvance(adv);
-                          setReturnedAmount(adv.balance_remaining > 0 ? adv.balance_remaining : 0);
-                          setSettleModalOpen(true);
-                        }}
-                      >
-                        Reconcile & Settle Advance
-                      </Button>
+          {/* Left 2 Cols: Details & Route */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Dispatch Summary</span>
+                  <StatusBadge status={trip.status} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                    <span className="text-muted-foreground block text-[11px] mb-1">Truck Assigned</span>
+                    <Link href={`/trucks/${trip.truck_id}`} className="font-mono font-bold text-sm text-primary hover:underline">
+                      {trip.truck?.reg_number}
+                    </Link>
+                    <p className="text-muted-foreground mt-0.5">{trip.truck?.make} {trip.truck?.model}</p>
+                    {trip.trailer && (
+                      <p className="font-mono text-[11px] text-muted-foreground mt-1">
+                        Trailer {trip.trailer.reg_number}
+                      </p>
                     )}
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-4 text-muted-foreground text-xs">
-                  No advance issued for this trip.
+
+                  <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                    <span className="text-muted-foreground block text-[11px] mb-1">Driver</span>
+                    <p className="font-semibold text-sm text-foreground">{trip.driver?.name}</p>
+                    <p className="text-muted-foreground mt-0.5">{trip.driver?.phone}</p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                    <span className="text-muted-foreground block text-[11px] mb-1">Customer</span>
+                    <p className="font-semibold text-sm text-foreground">{trip.customer?.name}</p>
+                    <p className="text-muted-foreground mt-0.5">{trip.customer?.phone}</p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                    <span className="text-muted-foreground block text-[11px] mb-1">Distance Logged</span>
+                    <p className="font-mono font-bold text-sm text-foreground tabular-nums">
+                      {formatKm(trip.total_distance_km)}
+                    </p>
+                    <p className="text-muted-foreground mt-0.5 font-mono text-[11px]">
+                      {trip.start_odometer} to {trip.end_odometer ?? '...'}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-secondary/50 border border-border">
+                    <span className="text-muted-foreground block text-[11px] mb-1">Trip Dates</span>
+                    <p className="font-semibold text-sm text-foreground">Start: {formatDate(trip.start_date)}</p>
+                    <p className="text-muted-foreground mt-0.5">End: {trip.end_date ? formatDate(trip.end_date) : 'Not set'}</p>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {trip.notes && (
+                  <div className="mt-4 p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
+                    <strong>Notes:</strong> {trip.notes}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tabs for Direct Expenses vs Audit History */}
+            <div className="flex items-center gap-2 border-b border-border pb-2">
+              <button
+                type="button"
+                onClick={() => setActiveBottomTab('expenses')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${activeBottomTab === 'expenses'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }`}
+              >
+                Direct Expenses ({trip.expenses?.length ?? 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveBottomTab('history')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${activeBottomTab === 'history'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }`}
+              >
+                <History className="h-3.5 w-3.5" />
+                <span>Audit History</span>
+              </button>
+            </div>
+
+            {activeBottomTab === 'history' ? (
+              <Card className="p-4 max-h-[520px] overflow-y-auto">
+                <HistoryTimeline auditableType="trip" auditableId={trip.id} />
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <div>
+                    <CardTitle className="text-base">Trip Direct Expenses</CardTitle>
+                    <CardDescription>
+                      Fuel, driver per diems, tolls, cess, and emergency repairs incurred on this trip
+                    </CardDescription>
+                  </div>
+                  <Button size="sm" onClick={openAddExpenseModal}>
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    <span>Add Expense</span>
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border sticky top-0 z-10 backdrop-blur">
+                        <tr>
+                          <th className="py-2.5 px-4 text-left font-medium">Category</th>
+                          <th className="py-2.5 px-4 text-left font-medium">Details / Fuel Analysis</th>
+                          <th className="py-2.5 px-4 text-right font-medium">Amount</th>
+                          <th className="py-2.5 px-4 text-center font-medium">Status</th>
+                          <th className="py-2.5 px-4 text-right font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {trip.expenses?.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-6 text-center text-xs text-muted-foreground">
+                              No direct expenses recorded yet for this trip.
+                            </td>
+                          </tr>
+                        ) : (
+                          trip.expenses?.map((exp) => {
+                            const receipts = (exp.receipts?.length ? exp.receipts : (exp as any).attachments) as any[] | undefined;
+                            return (
+                              <tr key={exp.id} className="hover:bg-muted/40 transition-colors">
+                                <td className="py-3 px-4">
+                                  <span className="font-semibold text-foreground capitalize block">
+                                    {exp.category.replace(/_/g, ' ')}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {formatDateTime(exp.incurred_at)}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-xs align-top">
+                                  <div className="space-y-1.5 min-w-[220px]">
+                                    <p className="text-muted-foreground">
+                                      Entered by {exp.entered_by_name || 'Staff'}
+                                    </p>
+                                    {(exp.litres != null || exp.odometer_at_fill != null) && (
+                                      <p className="font-mono text-[11px] text-foreground/80">
+                                        {exp.litres != null ? `${exp.litres} L` : 'Fuel qty N/A'}
+                                        {exp.odometer_at_fill != null ? ` @ Odo ${exp.odometer_at_fill} km` : ''}
+                                      </p>
+                                    )}
+                                    {exp.notes && (
+                                      <p className="text-[11px] text-muted-foreground whitespace-pre-wrap">
+                                        <span className="font-medium text-foreground/80">Notes/Ref:</span> {exp.notes}
+                                      </p>
+                                    )}
+                                    {(exp.receipt_path || receipts?.length) && (
+                                      <div className="text-[11px] text-primary space-y-0.5">
+                                        <span className="font-medium text-foreground/80">Receipts:</span>{' '}
+                                        {receipts?.length ? (
+                                          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                                            {receipts.map((r: any, idx: number) => {
+                                              const p = typeof r === 'string' ? r : r?.url || r?.path || r?.file_path;
+                                              const href = getFileUrl(p);
+                                              const label = typeof r === 'string' ? `Receipt ${idx + 1}` : r?.name || r?.original_name || `Receipt ${idx + 1}`;
+                                              const openPath = r?.id ? `/expenses/${exp.id}/attachments/${r.id}` : (p || `/expenses/${exp.id}/receipt`);
+                                              return href || r?.id ? (
+                                                <button
+                                                  key={idx}
+                                                  type="button"
+                                                  onClick={() => openProtectedFile(openPath).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                                                  className="underline hover:text-primary/80"
+                                                >
+                                                  {label}
+                                                </button>
+                                              ) : (
+                                                <span key={idx} className="text-muted-foreground">{label}</span>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : getFileUrl(exp.receipt_path) ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => openProtectedFile(`/expenses/${exp.id}/receipt`).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                                            className="underline hover:text-primary/80 ml-1"
+                                          >
+                                            Open receipt
+                                          </button>
+                                        ) : (
+                                          <span className="text-muted-foreground ml-1">attached</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {exp.fuel_analysis?.is_anomaly && (
+                                      <div className="flex items-start gap-1 text-[11px] font-semibold text-destructive">
+                                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                        <span>
+                                          Fuel anomaly: {exp.fuel_analysis.km_per_litre} km/L ({exp.fuel_analysis.deviation_pct}% dev)
+                                          {exp.fuel_analysis.reason ? `   ${exp.fuel_analysis.reason}` : ''}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {exp.rejection_reason && (
+                                      <p className="text-[11px] text-destructive">
+                                        <span className="font-semibold">Rejection reason:</span> {exp.rejection_reason}
+                                      </p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-right font-mono font-semibold align-top">
+                                  <MoneyText amount={exp.amount} size="base" />
+                                </td>
+                                <td className="py-3 px-4 text-center align-top">
+                                  <StatusBadge status={exp.status} />
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                      onClick={() => setEditingExpense(exp)}
+                                      title="Edit expense details"
+                                    >
+                                      <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                      Edit
+                                    </Button>
+                                    {exp.status === 'pending' && (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success-bg"
+                                          onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'approved' })}
+                                        >
+                                          Approve
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive-bg"
+                                          onClick={() => {
+                                            const reason = window.prompt('Reason for rejecting this expense (required):', '');
+                                            if (reason && reason.trim()) {
+                                              expenseStatusMutation.mutate({ expenseId: exp.id, status: 'rejected', reason: reason.trim() });
+                                            } else if (reason !== null) {
+                                              toast.error('Rejection reason is required');
+                                            }
+                                          }}
+                                        >
+                                          Reject
+                                        </Button>
+                                      </>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                      onClick={() => {
+                                        setExpenseToReassign(exp);
+                                        setReassignModalOpen(true);
+                                      }}
+                                      title="Reassign to another trip"
+                                    >
+                                      <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                      Reassign
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Right 1 Col: Trip P&L Card & Driver Advance Settlement */}
+          <div className="space-y-6">
+            {/* Official Trip P&L Card */}
+            <Card className="border-primary/30">
+              <CardHeader className="bg-primary/5 pb-3 border-b border-border">
+                <CardTitle className="text-base text-primary flex items-center justify-between">
+                  <span>Trip Financial P&L</span>
+                  <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-primary text-white">
+                    Contribution
+                  </span>
+                </CardTitle>
+                <CardDescription>
+                  Live revenue vs approved direct expense reconciliation
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-5 space-y-4 text-xs">
+                {/* Agreed Rate */}
+                <div className="flex items-center justify-between py-2 border-b border-border/60">
+                  <span className="text-muted-foreground font-medium">Agreed Revenue Rate</span>
+                  <MoneyText amount={pnl?.revenue ?? trip.agreed_rate} size="lg" />
+                </div>
+
+                {/* Direct Expenses Breakdown */}
+                <div className="space-y-2 py-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Approved Direct Expenses
+                  </span>
+                  {pnl?.breakdown_by_category && (() => {
+                    const entries = Object.entries(pnl.breakdown_by_category)
+                      .filter(([, amt]) => Number(amt) > 0)
+                      .sort((a, b) => Number(b[1]) - Number(a[1]));
+                    if (!entries.length) {
+                      return <p className="text-muted-foreground text-[11px]">No approved direct expenses yet.</p>;
+                    }
+                    return (
+                      <div className="max-h-36 overflow-y-auto overscroll-contain pr-1 space-y-1.5 rounded-md border border-border/50 bg-background/40 p-2">
+                        {entries.map(([cat, amt]) => (
+                          <div key={cat} className="flex items-center justify-between text-muted-foreground gap-3 text-[11px] shrink-0">
+                            <span className="capitalize truncate">{cat.replace(/_/g, ' ')}</span>
+                            <MoneyText amount={amt} size="sm" />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  <div className="flex justify-between font-semibold text-destructive pt-2 border-t border-border/40">
+                    <span>Total Direct Costs</span>
+                    <MoneyText amount={pnl?.approved_direct_costs ?? 0} variant="negative" size="base" />
+                  </div>
+                </div>
+                {/* Contribution Highlight Box */}
+                <div className="p-4 rounded-xl bg-success-bg/80 border border-success/30 text-success-foreground space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs uppercase font-bold tracking-wider">Trip Contribution</span>
+                    <span className="font-mono text-xl font-bold">
+                      {formatKES(pnl?.contribution ?? trip.contribution)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-success font-medium">
+                    <span>Contribution Margin</span>
+                    <span>{pnl?.contribution_margin_pct ?? 0}%</span>
+                  </div>
+                </div>
+
+                {/* Mandatory East African Transporter Disclaimer */}
+                <div className="p-3 rounded-lg bg-secondary/80 border border-border text-[11px] text-muted-foreground leading-relaxed">
+                  <strong>Accounting Note:</strong> Contribution reflects revenue minus approved direct haulage costs. Shared fleet overheads (insurance, yard rent, finance interest) are excluded.
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Driver Advance Settlement Panel */}
+            <Card>
+              <CardHeader className="pb-3 border-b border-border">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Driver Advance Trail</span>
+                  {trip.advances && trip.advances[0] && (
+                    <StatusBadge status={trip.advances[0].status} />
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Settlement trail: advance given â†’ accepted expenses â†’ returned balance
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-5 text-xs space-y-3">
+                {trip.advances && trip.advances.length > 0 ? (
+                  trip.advances.map((adv) => (
+                    <div key={adv.id} className="space-y-3">
+                      <div className="flex justify-between py-1.5 border-b border-border/50">
+                        <span className="text-muted-foreground">1. Cash Advance Given</span>
+                        <MoneyText amount={adv.amount_given} size="base" />
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-border/50">
+                        <span className="text-muted-foreground">2. Expenses Accepted</span>
+                        <MoneyText amount={adv.expenses_accepted} size="base" />
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-border/50">
+                        <span className="text-muted-foreground">3. Cash Returned</span>
+                        <MoneyText amount={adv.amount_returned} size="base" />
+                      </div>
+                      <div className="flex justify-between py-2 font-bold text-foreground">
+                        <span>Unsettled Balance Due</span>
+                        <MoneyText
+                          amount={adv.balance_remaining}
+                          variant={adv.balance_remaining > 0 ? 'negative' : 'positive'}
+                          size="base"
+                        />
+                      </div>
+
+                      {/* Advance Adjustments Trail (if any) */}
+                      {adv.adjustments && adv.adjustments.length > 0 && (
+                        <div className="p-2.5 rounded-lg bg-secondary/60 border border-border space-y-1.5 my-2">
+                          <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider block">
+                            Adjustment Trail
+                          </span>
+                          {adv.adjustments.map((adj) => (
+                            <div key={adj.id} className="text-[11px] flex justify-between items-start border-t border-border/40 pt-1">
+                              <div>
+                                <span className="font-semibold text-foreground">{adj.type === 'additional_advance' ? '+ KES ' : '- KES '}{adj.amount.toLocaleString()}</span>
+                                <p className="text-[10px] text-muted-foreground">{adj.reason}</p>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">{adj.created_at?.slice(0, 10)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {adv.status === 'open' && (
+                        <Button
+                          size="sm"
+                          className="w-full mt-2"
+                          onClick={() => {
+                            setSelectedAdvance(adv);
+                            setReturnedAmount(adv.balance_remaining > 0 ? adv.balance_remaining : 0);
+                            setSettleModalOpen(true);
+                          }}
+                        >
+                          Reconcile & Settle Advance
+                        </Button>
+                      )}
+
+                      {adv.status === 'settled' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-2"
+                          onClick={() => setAdjustingAdvance(adv)}
+                        >
+                          <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                          Post Advance Adjustment
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground text-xs">
+                    No advance issued for this trip.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
       )}
 
       {/* Documents Tab */}
@@ -1113,16 +1374,16 @@ export default function TripDetailPage() {
                       issued_date: docDate,
                       ...(addDocType === 'container_interchange'
                         ? {
-                            container_number: containerNumber.trim() || undefined,
-                            container_size: containerSize || undefined,
-                            container_type: containerType || undefined,
-                            seal_number: sealNumber.trim() || undefined,
-                            depot_or_terminal: depotTerminal.trim() || undefined,
-                            interchange_direction: 'out',
-                          }
+                          container_number: containerNumber.trim() || undefined,
+                          container_size: containerSize || undefined,
+                          container_type: containerType || undefined,
+                          seal_number: sealNumber.trim() || undefined,
+                          depot_or_terminal: depotTerminal.trim() || undefined,
+                          interchange_direction: 'out',
+                        }
                         : {
-                            receiver_name: receiverName.trim() || undefined,
-                          }),
+                          receiver_name: receiverName.trim() || undefined,
+                        }),
                     };
                     addDocMutation.mutate(payload);
                   }}
@@ -1251,19 +1512,20 @@ export default function TripDetailPage() {
           >
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Expense Category</label>
-              <select
-                {...register('category')}
-                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary capitalize"
-              >
-                <option value="fuel">Fuel (Diesel Refill)</option>
-                <option value="allowance">Driver Allowance (Per Diem)</option>
-                <option value="toll">Toll & Weighing Cess</option>
-                <option value="county_levy_cess">County Levy / Cess</option>
-                <option value="border_fees">Border Clearance Fees</option>
-                <option value="loading_offloading">Loading / Offloading</option>
-                <option value="repairs">Emergency En-Route Repairs</option>
-                <option value="other">Other Incidentals</option>
-              </select>
+              <Controller
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <CategorySelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    suggestions={(trip.expenses || []).map((e) => e.category)}
+                  />
+                )}
+              />
+              {expenseErrors.category && (
+                <p className="text-[11px] text-destructive mt-1">{expenseErrors.category.message}</p>
+              )}
             </div>
 
             <div>
@@ -1271,9 +1533,9 @@ export default function TripDetailPage() {
               <Input
                 type="number"
                 step="10"
-                placeholder="e.g. 5000"
+                placeholder="Enter amount"
                 {...register('amount', {
-                  setValueAs: (v) => (v === '' ? undefined : Number(v)),
+                  setValueAs: (v) => (v === '' || v === undefined || v === null || Number.isNaN(Number(v)) ? undefined : Number(v)),
                 })}
               />
               {expenseErrors.amount && (
@@ -1285,13 +1547,13 @@ export default function TripDetailPage() {
             {watchCategory === 'fuel' && (
               <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-secondary/50 border border-border">
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1">Litres Filled</label>
+                  <label className="text-xs font-semibold text-foreground block mb-1">Litres Filled (Optional)</label>
                   <Input
                     type="number"
                     step="0.1"
                     placeholder="e.g. 150"
                     {...register('litres', {
-                      setValueAs: (v) => (v === '' ? undefined : Number(v)),
+                      setValueAs: (v) => (v === '' || v === undefined || v === null ? null : Number(v)),
                     })}
                   />
                   {expenseErrors.litres && (
@@ -1299,12 +1561,12 @@ export default function TripDetailPage() {
                   )}
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1">Odometer at Pump</label>
+                  <label className="text-xs font-semibold text-foreground block mb-1">Odometer at Pump (Optional)</label>
                   <Input
                     type="number"
-                    placeholder="KM"
+                    placeholder="KM reading"
                     {...register('odometer_at_fill', {
-                      setValueAs: (v) => (v === '' ? undefined : Number(v)),
+                      setValueAs: (v) => (v === '' || v === undefined || v === null ? null : Number(v)),
                     })}
                   />
                   {expenseErrors.odometer_at_fill && (
@@ -1315,15 +1577,18 @@ export default function TripDetailPage() {
             )}
 
             <div>
-              <label className="text-xs font-semibold text-foreground block mb-1">Date & Time Incurred</label>
-              <Input type="datetime-local" {...register('incurred_at')} />
+              <label className="text-xs font-semibold text-foreground block mb-1">Date &amp; Time Incurred</label>
+              <Input type="datetime-local" {...register('incurred_at')} placeholder="" />
+              {expenseErrors.incurred_at && (
+                <p className="text-[11px] text-destructive mt-1">{expenseErrors.incurred_at.message}</p>
+              )}
               {expenseErrors.incurred_at && (
                 <p className="text-[11px] text-destructive mt-1">{expenseErrors.incurred_at.message}</p>
               )}
             </div>
 
-            {/* Receipt Upload with Camera Capture */}
-            <FileUpload onFileSelect={(file) => setSelectedReceipt(file)} />
+            {/* Receipt/Document Uploads */}
+            <FileUpload onFilesSelect={setSelectedReceipts} label="Attach Receipts or Documents (multiple allowed)" />
 
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Notes / Receipt Number</label>
@@ -1381,7 +1646,7 @@ export default function TripDetailPage() {
                   ?.filter((t) => t.id !== Number(tripId))
                   ?.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.reference} — {t.origin} to {t.destination} ({t.truck?.reg_number})
+                      {t.reference} â€” {t.origin} to {t.destination} ({t.truck?.reg_number})
                     </option>
                   ))}
               </select>
@@ -1521,7 +1786,35 @@ export default function TripDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Safe Editing Sheet and Dialogs */}
+      <EditTripSheet
+        trip={trip}
+        trucks={trucksData?.data ?? []}
+        activeTrips={activeTripsData?.data ?? []}
+        drivers={driversData?.data ?? []}
+        customers={customersData?.data ?? []}
+        open={editTripSheetOpen}
+        onOpenChange={setEditTripSheetOpen}
+      />
+
+      <EditExpenseDialog
+        expense={editingExpense}
+        open={!!editingExpense}
+        onOpenChange={(open) => {
+          if (!open) setEditingExpense(null);
+        }}
+      />
+
+      <AdvanceAdjustmentDialog
+        advance={adjustingAdvance}
+        open={!!adjustingAdvance}
+        onOpenChange={(open) => {
+          if (!open) setAdjustingAdvance(null);
+        }}
+      />
     </div>
   );
 }
+
 

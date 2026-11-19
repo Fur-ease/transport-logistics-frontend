@@ -1,5 +1,56 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+export function getFileUrl(path?: string | null): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  const clean = path.replace(/^\/+/, '');
+  if (clean.startsWith('storage/')) return `${origin}/${clean}`;
+  return `${origin}/storage/${clean}`;
+}
+
+export async function openProtectedFile(path?: string | null): Promise<void> {
+  const url = getFileUrl(path);
+  if (!url) throw new Error('No file path provided');
+
+  // Open immediately to preserve user gesture ("flash") and avoid popup blocking
+  const win = window.open('', '_blank');
+  if (!win) throw new Error('Popup blocked. Allow popups to view receipts.');
+
+  const token = getAuthToken();
+  const withAuth = async (target: string) => {
+    const headers: HeadersInit = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(target, { headers, credentials: 'include' });
+    if (!response.ok) throw new ApiError(`Failed to open file (${response.status})`, response.status);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    win.location.replace(objectUrl);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  };
+
+  try {
+    await withAuth(url);
+  } catch (err) {
+    // Fallback: some deployments protect /storage via API route
+    try {
+      const alt = url.replace(/\/storage\//, '/api/v1/storage/');
+      if (alt !== url) {
+        await withAuth(alt);
+        return;
+      }
+    } catch {}
+    // If fetch is blocked (CORS/network), fall back to direct navigation
+    if (err instanceof TypeError) {
+      win.location.replace(url);
+      return;
+    }
+    try { win.close(); } catch {}
+    if (err instanceof Error) throw err;
+    throw new Error('Failed to open receipt');
+  }
+}
+
 export class ApiError extends Error {
   status: number;
   errors?: Record<string, string[]>;

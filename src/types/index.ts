@@ -22,6 +22,49 @@ export interface Organization {
 
 export type TruckStatus = 'available' | 'on_trip' | 'maintenance' | 'inactive';
 
+export type TrailerStatus = 'available' | 'in_use' | 'maintenance' | 'inactive';
+
+export interface Trailer {
+  id: number;
+  organization_id: number;
+  reg_number: string;
+  type: string;
+  make?: string | null;
+  model?: string | null;
+  year?: number | null;
+  capacity_tons: number;
+  tare_weight_tons?: number | null;
+  status: TrailerStatus;
+  version?: number;
+  trips_count?: number;
+  active_assignment?: TruckTrailerAssignment | null;
+  assignments?: TruckTrailerAssignment[];
+  trips?: Trip[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TruckTrailerAssignment {
+  id: number;
+  organization_id: number;
+  truck_id: number;
+  trailer_id: number;
+  truck?: Truck;
+  trailer?: Trailer;
+  coupled_at: string;
+  uncoupled_at?: string | null;
+  odometer_at_couple?: number | null;
+  odometer_at_uncouple?: number | null;
+  coupled_by?: number | null;
+  uncoupled_by?: number | null;
+  coupled_by_user?: Pick<User, 'id' | 'name'> | null;
+  uncoupled_by_user?: Pick<User, 'id' | 'name'> | null;
+  couple_notes?: string | null;
+  uncouple_reason?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Truck {
   id: number;
   organization_id: number;
@@ -33,10 +76,14 @@ export interface Truck {
   capacity_tons: number;
   odometer_km: number;
   status: TruckStatus;
+  version?: number;
   total_trips?: number;
   completed_trips?: number;
+  trips_count?: number;
   created_at?: string;
   updated_at?: string;
+  current_assignment?: TruckTrailerAssignment | null;
+  trailer_assignments?: TruckTrailerAssignment[];
   trips?: Trip[];
   maintenance_records?: MaintenanceRecord[];
   compliance_documents?: ComplianceDocument[];
@@ -53,6 +100,7 @@ export interface Driver {
   licence_no: string;
   licence_expiry: string;
   status: DriverStatus;
+  version?: number;
   total_trips?: number;
   completed_trips?: number;
   user?: User;
@@ -68,6 +116,7 @@ export interface Customer {
   phone: string;
   email?: string | null;
   payment_terms_days: number;
+  version?: number;
   total_trips?: number;
   total_invoiced?: number;
   total_paid?: number;
@@ -91,6 +140,8 @@ export interface Trip {
   reference: string;
   truck_id: number;
   truck?: Truck;
+  trailer_id?: number | null;
+  trailer?: Trailer | null;
   driver_id: number;
   driver?: Driver;
   customer_id: number;
@@ -106,6 +157,9 @@ export interface Trip {
   end_odometer?: number | null;
   total_distance_km: number;
   status: TripStatus;
+  version?: number;
+  is_rate_locked?: boolean;
+  has_active_unlock?: boolean;
   notes?: string | null;
   is_container_trip?: boolean;
   expected_container_count?: number | null;
@@ -127,7 +181,8 @@ export type ExpenseCategory =
   | 'border_fees'
   | 'loading_offloading'
   | 'repairs'
-  | 'other';
+  | 'other'
+  | (string & {});
 
 export type ExpenseStatus = 'pending' | 'approved' | 'rejected';
 
@@ -154,16 +209,31 @@ export interface TripExpense {
   litres?: number | null;
   odometer_at_fill?: number | null;
   receipt_path?: string | null;
+  receipts?: Array<{ id?: number; path?: string; url?: string; name?: string } | string>;
   entered_by: number;
   entered_by_name?: string;
   status: ExpenseStatus;
   rejection_reason?: string | null;
+  notes?: string | null;
+  version?: number;
   incurred_at: string;
   created_at?: string;
   fuel_analysis?: FuelAnalysis;
 }
 
 export type AdvanceStatus = 'open' | 'settled';
+
+export interface AdvanceAdjustment {
+  id: number;
+  organization_id: number;
+  driver_advance_id: number;
+  amount: number;
+  type: 'additional_advance' | 'reversal_credit';
+  reason: string;
+  created_by?: number;
+  creator?: { id: number; name: string };
+  created_at?: string;
+}
 
 export interface DriverAdvance {
   id: number;
@@ -173,16 +243,33 @@ export interface DriverAdvance {
   driver_id: number;
   driver_name?: string;
   amount_given: number;
+  total_adjustments?: number;
+  adjusted_amount_given?: number;
   expenses_accepted: number;
   amount_returned: number;
   balance_remaining: number;
   status: AdvanceStatus;
+  is_locked?: boolean;
+  version?: number;
   settled_at?: string | null;
   notes?: string | null;
   created_at?: string;
+  adjustments?: AdvanceAdjustment[];
 }
 
 export type InvoiceStatus = 'unpaid' | 'part_paid' | 'paid' | 'overdue';
+
+export interface CreditNote {
+  id: number;
+  organization_id: number;
+  invoice_id: number;
+  number: string;
+  amount: number;
+  reason: string;
+  issued_by?: number;
+  status: 'applied' | 'voided';
+  created_at?: string;
+}
 
 export interface Invoice {
   id: number;
@@ -196,12 +283,16 @@ export interface Invoice {
   number: string;
   amount: number;
   total_paid: number;
+  total_credited?: number;
   balance_due: number;
+  is_amount_locked?: boolean;
+  version?: number;
   due_date: string;
   status: InvoiceStatus;
   notes?: string | null;
   created_at?: string;
   payments?: Payment[];
+  credit_notes?: CreditNote[];
 }
 
 export interface Payment {
@@ -210,7 +301,17 @@ export interface Payment {
   invoice_id: number;
   amount: number;
   method: 'cash' | 'mpesa' | 'bank';
+  bank_name?: string | null;
+  cheque_number?: string | null;
+  transaction_code?: string | null;
+  payer_name?: string | null;
+  proof_path?: string | null;
+  notes?: string | null;
   reference?: string | null;
+  status?: 'valid' | 'voided';
+  void_reason?: string | null;
+  voided_at?: string | null;
+  voided_by_name?: string | null;
   paid_at: string;
   created_at?: string;
 }
@@ -430,4 +531,139 @@ export interface StagedUploadResponse {
   };
 }
 
+
+// ── Advancement C: Trip Profit Sheet ──────────────────────────────────────────
+
+export interface TripProfitRow {
+  id: number;
+  reference: string;
+  date: string;
+  truck_reg: string;
+  driver_name: string;
+  customer_name: string;
+  route: string;
+  revenue: number;
+  fuel: number;
+  allowance: number;
+  tolls_levies: number;
+  other_direct: number;
+  total_direct_costs: number;
+  contribution: number;
+  margin_pct: number | null;
+  is_negative: boolean;
+  pending_expenses_count: number;
+  month_group: string;
+  status: string;
+}
+
+export interface TripProfitSummary {
+  trips_count: number;
+  revenue: number;
+  fuel_cost: number;
+  allowance_cost: number;
+  tolls_levies_cost: number;
+  other_direct_cost: number;
+  total_direct_costs: number;
+  contribution: number;
+  margin_pct: number | null;
+  avg_contribution_per_trip: number;
+  pending_expenses_count: number;
+  total_km: number;
+}
+
+export interface TripProfitGroup {
+  group_key: string;
+  group_type: string;
+  label: string;
+  subtotal: TripProfitSummary;
+  items: TripProfitRow[];
+}
+
+export interface TruckSummary {
+  truck_reg: string;
+  truck_id: number;
+  trips_made: number;
+  total_km: number;
+  revenue: number;
+  direct_costs: number;
+  contribution: number;
+  margin_pct: number | null;
+  contribution_per_trip: number;
+}
+
+export interface TripProfitReport {
+  summary: TripProfitSummary;
+  trips: TripProfitRow[];
+  all_matching_trips: TripProfitRow[];
+  groups: TripProfitGroup[];
+  filters_applied: Record<string, unknown>;
+  pagination: {
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+  };
+  truck_summaries: TruckSummary[];
+}
+
+export interface ReportExport {
+  id: number;
+  status: 'queued' | 'processing' | 'ready' | 'failed';
+  format: 'pdf' | 'csv';
+  scope: 'filtered' | 'all';
+  row_count: number;
+  file_name?: string;
+  download_url?: string;
+  error_message?: string;
+}
+
+// ── Advancement C: Missing Entries ────────────────────────────────────────────
+
+export interface DataIssue {
+  id: number;
+  rule_key: string;
+  subject_type: string;
+  subject_id: number;
+  truck?: { id: number; reg_number: string } | null;
+  driver?: { id: number; name: string } | null;
+  trip?: { id: number; reference: string; route: string } | null;
+  status: 'open' | 'resolved' | 'dismissed';
+  detected_at: string;
+  days_outstanding: number;
+  resolved_at?: string | null;
+  dismissed_reason?: string | null;
+  dismissed_by?: string | null;
+  assigned_to?: { id: number; name: string } | null;
+  meta: Record<string, unknown>;
+}
+
+export interface MissingEntriesSummary {
+  total_open: number;
+  by_category: Record<string, number>;
+  oldest_age_days: number;
+  data_completeness_pct: number;
+  total_trips: number;
+  clean_trips: number;
+}
+
+export interface MissingEntriesResponse {
+  data: DataIssue[];
+  summary: MissingEntriesSummary;
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+export interface OrganizationRuleSetting {
+  rule_key: string;
+  label: string;
+  category: string;
+  enabled: boolean;
+  threshold_days: number | null;
+  threshold_amount: number | null;
+  description: string;
+}
 

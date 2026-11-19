@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   ShieldAlert,
   Wrench,
+  Link2,
 } from 'lucide-react';
 
 type BadgeType =
@@ -20,6 +21,7 @@ type BadgeType =
   | 'paid'
   | 'cancelled'
   | 'available'
+  | 'in_use'
   | 'on_trip'
   | 'maintenance'
   | 'inactive'
@@ -49,6 +51,14 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         <Badge variant="slate" className={className}>
           <Clock className="h-3 w-3" />
           <span>Planned</span>
+        </Badge>
+      );
+
+    case 'in_use':
+      return (
+        <Badge variant="info" className={className}>
+          <Link2 className="h-3 w-3" />
+          <span>In Use</span>
         </Badge>
       );
 

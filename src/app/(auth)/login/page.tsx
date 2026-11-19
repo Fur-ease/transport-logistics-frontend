@@ -55,13 +55,12 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'owner@haultrack.co.ke',
-      password: 'password123',
+      email: '',
+      password: '',
     },
   });
 
@@ -100,13 +99,6 @@ export default function LoginPage() {
       setForgotSubmitted(true);
       toast.success('Password reset instructions sent');
     }, 800);
-  };
-
-  const setDemoRole = (roleEmail: string) => {
-    setValue('email', roleEmail);
-    setValue('password', 'password123');
-    setError(null);
-    toast.info(`Loaded demo credentials for ${roleEmail.split('@')[0]}`);
   };
 
   return (
@@ -176,7 +168,7 @@ export default function LoginPage() {
             <div className="relative">
               <Input
                 type="email"
-                placeholder="e.g. owner@haultrack.co.ke"
+                  placeholder="Enter your registered email"
                 {...register('email')}
                 className={`pl-9 ${errors.email ? 'border-destructive' : ''}`}
                 disabled={isLoading}
@@ -194,7 +186,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setForgotEmail(errors.email ? '' : 'owner@haultrack.co.ke');
+                  setForgotEmail('');
                   setForgotSubmitted(false);
                   setIsForgotPasswordOpen(true);
                 }}
@@ -253,50 +245,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {/* Quick Demo Switcher */}
-        <div className="mt-5 pt-4 border-t border-border">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              <span>Quick Demo Accounts:</span>
-            </span>
-            <span className="text-[10px] text-muted-foreground lowercase">Click to autofill</span>
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => setDemoRole('owner@haultrack.co.ke')}
-              className="p-2 rounded-lg border border-border bg-secondary/70 hover:bg-muted text-left font-medium transition-colors text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <div className="font-semibold text-primary">Owner</div>
-              <div className="text-[10px] text-muted-foreground">Full Org Control</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoRole('manager@haultrack.co.ke')}
-              className="p-2 rounded-lg border border-border bg-secondary/70 hover:bg-muted text-left font-medium transition-colors text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <div className="font-semibold text-primary">Manager</div>
-              <div className="text-[10px] text-muted-foreground">Fleet & Dispatch</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoRole('accountant@haultrack.co.ke')}
-              className="p-2 rounded-lg border border-border bg-secondary/70 hover:bg-muted text-left font-medium transition-colors text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <div className="font-semibold text-primary">Accountant</div>
-              <div className="text-[10px] text-muted-foreground">Invoices & Advances</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoRole('driver@haultrack.co.ke')}
-              className="p-2 rounded-lg border border-border bg-secondary/70 hover:bg-muted text-left font-medium transition-colors text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <div className="font-semibold text-accent">Driver</div>
-              <div className="text-[10px] text-muted-foreground">Mobile Camera & Trips</div>
-            </button>
-          </div>
-        </div>
+
 
         {/* Security Footer */}
         <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
@@ -331,13 +280,8 @@ export default function LoginPage() {
               </div>
 
               <div className="p-3 rounded-lg bg-secondary/80 border border-border text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground mb-1">Demo Environment Note:</p>
                 <p>
-                  For this MVP template, default accounts can be accessed using password{' '}
-                  <code className="font-mono bg-card px-1 py-0.5 rounded text-primary font-bold">
-                    password123
-                  </code>
-                  .
+                  If you cannot access your account, contact your system administrator to reset your credentials.
                 </p>
               </div>
 
@@ -359,7 +303,7 @@ export default function LoginPage() {
                   type="email"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  placeholder="e.g. owner@haultrack.co.ke"
+                placeholder="Enter your work email"
                   required
                 />
               </div>

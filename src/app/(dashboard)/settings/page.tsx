@@ -1,4 +1,5 @@
 'use client';
+import { syncFinancialState } from '@/lib/liveSync';
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -66,6 +67,22 @@ export default function SettingsPage() {
     queryFn: () => api.get<{ data: AuditLog[] }>('/settings/audit-logs'),
   });
 
+  const { data: rulesData, isLoading: isRulesLoading } = useQuery<{
+    data: Record<string, {
+      rule_key: string;
+      label: string;
+      category: string;
+      enabled: boolean;
+      threshold_days: number | null;
+      threshold_amount: number | null;
+      description: string;
+    }>;
+  }>({
+    queryKey: ['settings-rules'],
+    queryFn: () => api.get('/settings/rule-thresholds'),
+  });
+  const rules = rulesData?.data || {};
+
   const org = orgData?.data;
   const teamMembers = usersData?.data || [];
   const auditLogs = auditData?.data || [];
@@ -87,8 +104,8 @@ export default function SettingsPage() {
         name: orgName,
         fuel_alert_threshold_pct: fuelThreshold,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings-org'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('Organization settings saved');
     },
     onError: (err: Error) => {
@@ -104,21 +121,35 @@ export default function SettingsPage() {
     formState: { errors: userErrors },
   } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
-    defaultValues: {
-      role: 'driver',
-    },
   });
 
   const createUserMutation = useMutation({
     mutationFn: (userData: UserFormData) => api.post('/settings/users', userData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
       toast.success('User invited to workspace');
       setAddUserModalOpen(false);
       reset();
     },
     onError: (err: Error) => {
       toast.error(err.message || 'Failed to add user');
+    },
+  });
+
+  const updateRuleMutation = useMutation({
+    mutationFn: (payload: {
+      rule_key: string;
+      is_enabled: boolean;
+      threshold_days?: number | null;
+      threshold_amount?: number | null;
+    }) => api.put('/settings/rule-thresholds', payload),
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
+      await syncFinancialState(queryClient);
+      toast.success('Data quality rule updated');
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to save rule threshold');
     },
   });
 
@@ -130,10 +161,11 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="organization" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto p-1">
-          <TabsTrigger value="organization">Organization Profile</TabsTrigger>
-          <TabsTrigger value="users">Team & Roles ({teamMembers.length})</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto p-1">
+          <TabsTrigger value="organization">Organization</TabsTrigger>
+          <TabsTrigger value="users">Team &amp; Roles ({teamMembers.length})</TabsTrigger>
           <TabsTrigger value="thresholds">Alert Thresholds</TabsTrigger>
+          <TabsTrigger value="data-quality">Data Quality Rules (13)</TabsTrigger>
           <TabsTrigger value="audit">System Audit Logs</TabsTrigger>
         </TabsList>
 
@@ -214,7 +246,7 @@ export default function SettingsPage() {
                           <span>{m.name}</span>
                         </td>
                         <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.email}</td>
-                        <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.phone || '—'}</td>
+                        <td className="py-3.5 px-4 text-xs font-mono text-muted-foreground">{m.phone || 'â€”'}</td>
                         <td className="py-3.5 px-4 text-center">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize bg-secondary text-foreground border border-border">
                             {m.role}
@@ -277,7 +309,111 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Tab 4: System Audit Logs */}
+        {/* Tab 4: Advancement C - Data Quality Rule Thresholds */}
+        <TabsContent value="data-quality" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Continuous Scanner Rule Configuration</CardTitle>
+                  <CardDescription className="text-xs">
+                    Define active detection rules, operational day limits, and cash thresholds for missing fleet entries.
+                  </CardDescription>
+                </div>
+                {currentUser?.role !== 'owner' && currentUser?.role !== 'manager' && (
+                  <span className="text-xs bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2.5 py-1 rounded-md">
+                    Read-only (Owner/Manager required to edit)
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-secondary/60 text-muted-foreground uppercase border-y border-border">
+                    <tr>
+                      <th className="py-2.5 px-3 text-left font-medium">Rule &amp; Detection Scope</th>
+                      <th className="py-2.5 px-3 text-left font-medium">Category</th>
+                      <th className="py-2.5 px-3 text-center font-medium">Status</th>
+                      <th className="py-2.5 px-3 text-left font-medium">Days Limit</th>
+                      <th className="py-2.5 px-3 text-left font-medium">Amount Limit (KES)</th>
+                      <th className="py-2.5 px-3 text-right font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {Object.entries(rules).map(([key, rule]) => {
+                      const canEdit = currentUser?.role === 'owner' || currentUser?.role === 'manager';
+                      return (
+                        <tr key={key} className="hover:bg-muted/40 transition-colors">
+                          <td className="py-3 px-3 max-w-sm">
+                            <div className="font-semibold text-foreground">{rule.label}</div>
+                            <div className="text-[11px] text-muted-foreground mt-0.5">{rule.description}</div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="bg-secondary px-2 py-0.5 rounded text-[10px] font-medium text-foreground">
+                              {rule.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                rule.enabled
+                                  ? 'bg-success/15 text-success'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {rule.enabled ? 'Active' : 'Disabled'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            {rule.threshold_days !== null ? (
+                              <div className="flex items-center gap-1 font-mono text-xs">
+                                <span>{rule.threshold_days} days</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">â€”</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            {rule.threshold_amount !== null ? (
+                              <div className="font-mono text-xs">
+                                KSh {rule.threshold_amount.toLocaleString()}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">â€”</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            {canEdit && (
+                              <Button
+                                size="sm"
+                                variant={rule.enabled ? 'outline' : 'default'}
+                                className="h-7 text-xs px-2.5"
+                                disabled={updateRuleMutation.isPending}
+                                onClick={() =>
+                                  updateRuleMutation.mutate({
+                                    rule_key: key,
+                                    is_enabled: !rule.enabled,
+                                    threshold_days: rule.threshold_days,
+                                    threshold_amount: rule.threshold_amount,
+                                  })
+                                }
+                              >
+                                {rule.enabled ? 'Disable' : 'Enable'}
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 5: System Audit Logs */}
         <TabsContent value="audit" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-3">

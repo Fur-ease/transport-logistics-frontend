@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './AuthProvider';
+import { LIVE_REFETCH_MS } from '@/lib/liveSync';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -12,8 +13,13 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 1000 * 30, // 30 seconds
-            refetchOnWindowFocus: false,
+            staleTime: 0,
+            gcTime: 1000 * 60 * 5,
+            refetchInterval: LIVE_REFETCH_MS,
+            refetchOnWindowFocus: true,
+            refetchOnReconnect: true,
+            refetchOnMount: 'always',
+            placeholderData: (previousData: unknown) => previousData,
             retry: 1,
           },
         },
@@ -36,4 +42,3 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     </NextThemesProvider>
   );
 }
-
