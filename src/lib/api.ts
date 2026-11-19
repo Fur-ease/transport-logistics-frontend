@@ -78,6 +78,8 @@ export function clearAuthToken(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('haultrack_token');
     localStorage.removeItem('haultrack_user');
+    localStorage.removeItem('haultrack_impersonated_org_id');
+    localStorage.removeItem('haultrack_impersonated_org_name');
   }
 }
 
@@ -91,6 +93,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  if (typeof window !== 'undefined') {
+    const impersonatedOrgId = localStorage.getItem('haultrack_impersonated_org_id');
+    if (impersonatedOrgId && !headers.has('X-Organization-Id')) {
+      headers.set('X-Organization-Id', impersonatedOrgId);
+    }
   }
 
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
@@ -110,6 +119,17 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (!response.ok) {
     if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+      clearAuthToken();
+      window.location.href = '/login';
+    }
+
+    if (
+      response.status === 403 &&
+      isJson &&
+      (data?.code === 'ORG_BLOCKED' || data?.code === 'ORG_EXPIRED') &&
+      typeof window !== 'undefined' &&
+      !window.location.pathname.includes('/login')
+    ) {
       clearAuthToken();
       window.location.href = '/login';
     }

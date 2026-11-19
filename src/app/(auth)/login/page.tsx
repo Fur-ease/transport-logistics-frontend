@@ -73,7 +73,9 @@ export default function LoginPage() {
       login(response.token, response.user);
       toast.success(`Welcome back, ${response.user.name}`);
 
-      if (response.user.role === 'driver') {
+      if (response.user.role === 'super_admin') {
+        router.push('/super-admin');
+      } else if (response.user.role === 'driver') {
         router.push('/driver');
       } else {
         router.push('/');
