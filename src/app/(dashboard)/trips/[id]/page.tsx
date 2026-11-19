@@ -84,7 +84,7 @@ const expenseSchema = z.object({
     .min(1, 'Expense category is required')
     .max(50, 'Category is too long')
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9 _\/&-]*$/, 'Invalid category name'),
-  amount: z.number({ error: 'Amount in KES is required' }{ message: 'Amount in KES is required' }).min(1, 'Amount must be at least 1 KES'),
+  amount: z.number({ message: 'Amount in KES is required' }).min(1, 'Amount must be at least 1 KES'),
   litres: z.number().optional().nullable(),
   odometer_at_fill: z.number().optional().nullable(),
   incurred_at: z.string().min(1, 'Date and time required'),
@@ -108,6 +108,16 @@ interface TripPnLResponse {
   contribution_per_km: number;
 }
 
+function getCurrentLocalDateTime(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function TripDetailPage() {
   const params = useParams();
   const tripId = params.id as string;
@@ -122,7 +132,7 @@ export default function TripDetailPage() {
     resetExpenseForm({
       category: '',
       amount: undefined as unknown as number,
-      incurred_at: '',
+      incurred_at: getCurrentLocalDateTime(),
       litres: undefined,
       odometer_at_fill: undefined,
       notes: '',
@@ -244,7 +254,7 @@ export default function TripDetailPage() {
     defaultValues: {
       category: '',
       amount: undefined as unknown as number,
-      incurred_at: '',
+      incurred_at: getCurrentLocalDateTime(),
       notes: '',
     },
   });
@@ -264,7 +274,16 @@ export default function TripDetailPage() {
         data.append('odometer_at_fill', String(formData.odometer_at_fill));
       }
       // send as ISO instant so stored/displayed time matches the selected local date & time
-      data.append('incurred_at', new Date(formData.incurred_at).toISOString());
+      let incurredAtIso = formData.incurred_at;
+      try {
+        const d = new Date(formData.incurred_at);
+        if (!isNaN(d.getTime())) {
+          incurredAtIso = d.toISOString();
+        }
+      } catch {
+        incurredAtIso = formData.incurred_at;
+      }
+      data.append('incurred_at', incurredAtIso);
       if (formData.notes) data.append('notes', formData.notes);
       selectedReceipts.forEach((file) => data.append('receipts[]', file));
 
@@ -275,9 +294,9 @@ export default function TripDetailPage() {
       toast.success('Expense recorded successfully');
       setAddExpenseOpen(false);
       resetExpenseForm({
-        category: undefined as unknown as ExpenseFormData['category'],
+        category: '',
         amount: undefined as unknown as number,
-        incurred_at: '',
+        incurred_at: getCurrentLocalDateTime(),
         litres: undefined,
         odometer_at_fill: undefined,
         notes: '',
@@ -1579,9 +1598,6 @@ export default function TripDetailPage() {
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">Date &amp; Time Incurred</label>
               <Input type="datetime-local" {...register('incurred_at')} placeholder="" />
-              {expenseErrors.incurred_at && (
-                <p className="text-[11px] text-destructive mt-1">{expenseErrors.incurred_at.message}</p>
-              )}
               {expenseErrors.incurred_at && (
                 <p className="text-[11px] text-destructive mt-1">{expenseErrors.incurred_at.message}</p>
               )}
