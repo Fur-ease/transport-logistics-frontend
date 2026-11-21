@@ -84,11 +84,12 @@ export default function DashboardPage() {
   });
   const missingSummary = missingResponse?.summary;
 
-  const { data: stats, isPending, isError, isFetching, refetch, dataUpdatedAt } = useQuery<DashboardStats>({
+  const { data: stats, isPending, isError, error, isFetching, refetch, dataUpdatedAt } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', fromDate, toDate],
     queryFn: () => api.get<DashboardStats>('/dashboard/stats', { from: fromDate, to: toDate }),
     refetchInterval: LIVE_REFETCH_MS,
     placeholderData: (prev) => prev,
+    retry: 1,
   });
 
   const truckRows = stats?.trips_per_truck?.trucks || [];
@@ -100,7 +101,7 @@ export default function DashboardPage() {
     expenses: t.expenses,
   }));
 
-  const showInitialSkeleton = isPending;
+  const isInitialLoad = isPending && !stats;
 
   return (
     <div className="space-y-6">
@@ -187,10 +188,12 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {isError && !stats ? (
+      {isError ? (
         <Card className="p-4 border-destructive/40 bg-destructive/5">
           <p className="text-sm font-medium text-destructive">Failed to load dashboard data.</p>
-          <p className="text-xs text-muted-foreground mt-1">Check connection/login and try refresh.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {error instanceof Error ? error.message : 'Check connection/login and try refresh.'}
+          </p>
           <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry
           </Button>
@@ -198,7 +201,7 @@ export default function DashboardPage() {
       ) : null}
 
       {/* KPI Stat Cards Grid */}
-      {showInitialSkeleton ? (
+      {isInitialLoad ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="p-4 space-y-2">
@@ -297,7 +300,7 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="pt-4">
-            {showInitialSkeleton ? (
+            {isInitialLoad ? (
               <Skeleton className="h-72 w-full" />
             ) : chartData.length === 0 ? (
               <div className="h-72 flex items-center justify-center text-sm text-muted-foreground">
@@ -370,7 +373,7 @@ export default function DashboardPage() {
             </span>
           </CardHeader>
           <CardContent className="pt-2">
-            {showInitialSkeleton ? (
+            {isInitialLoad ? (
               <div className="space-y-3">
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />
@@ -483,7 +486,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {showInitialSkeleton ? (
+            {isInitialLoad ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i}>
                       <td colSpan={7} className="p-4">

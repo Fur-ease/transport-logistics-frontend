@@ -667,9 +667,9 @@ export default function SettingsPage() {
                             )}
                           </td>
                           <td className="py-3 px-3">
-                            {rule.threshold_amount !== null ? (
+                            {rule.threshold_amount !== null && rule.threshold_amount !== undefined ? (
                               <div className="font-mono text-xs">
-                                KSh {rule.threshold_amount.toLocaleString()}
+                                KSh {Number(rule.threshold_amount).toLocaleString()}
                               </div>
                             ) : (
                               <span className="text-muted-foreground">â€”</span>

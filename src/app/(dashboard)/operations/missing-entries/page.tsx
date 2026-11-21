@@ -521,10 +521,11 @@ export default function MissingEntriesPage() {
                   </tr>
                 ) : (
                   issues.map((issue) => {
-                    const meta = RULE_METADATA[issue.rule_key] || {
-                      label: issue.rule_key.replace(/_/g, ' '),
-                      category: 'General',
-                      severity: 'warning',
+                    const ruleKey = (issue.rule_key ?? (issue as any).rule ?? 'unknown') as string;
+                    const meta = RULE_METADATA[ruleKey] || {
+                      label: String(ruleKey).replace(/_/g, ' '),
+                      category: (issue as any).category || 'General',
+                      severity: ((issue as any).severity as 'critical' | 'warning' | 'info') || 'warning',
                     };
                     const fix = getFixLink(issue);
 
@@ -717,7 +718,7 @@ export default function MissingEntriesPage() {
             <div className="space-y-3 py-2">
               <div className="p-3 bg-secondary/70 rounded-lg border border-border text-xs space-y-1">
                 <div className="font-semibold text-foreground">
-                  {RULE_METADATA[dismissTarget.rule_key]?.label || dismissTarget.rule_key}
+                  {RULE_METADATA[(dismissTarget.rule_key ?? (dismissTarget as any).rule ?? '') as string]?.label || (dismissTarget.rule_key ?? (dismissTarget as any).rule ?? 'Unknown rule')}
                 </div>
                 {dismissTarget.trip && (
                   <div className="text-muted-foreground">
