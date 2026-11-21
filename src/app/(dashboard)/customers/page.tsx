@@ -48,22 +48,25 @@ type CustomerFormData = z.infer<typeof customerSchema>;
 export default function CustomersPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [hasBalance, setHasBalance] = useState('');
+  const [page, setPage] = useState(1);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const { data, isLoading } = useQuery<{ data: Customer[] }>({
-    queryKey: ['customers'],
-    queryFn: () => api.get<{ data: Customer[] }>('/customers'),
+  const { data, isLoading } = useQuery<{ data: Customer[]; meta?: any; summary?: any }>({
+    queryKey: ['customers', search, hasBalance, page],
+    queryFn: () => {
+      const q = new URLSearchParams({ page: String(page), per_page: '15' });
+      if (search.trim()) q.set('search', search.trim());
+      if (hasBalance) q.set('has_balance', hasBalance);
+      return api.get(`/customers?${q.toString()}`);
+    },
+    placeholderData: (prev) => prev,
   });
 
   const customers = data?.data || [];
-
-  const filteredCustomers = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const totalReceivables = customers.reduce((sum, c) => sum + (c.balance_owed || 0), 0);
+  const meta = data?.meta;
+  const summary = data?.summary;
+  const totalReceivables = summary?.total_owed ?? 0;
 
   const {
     register,
@@ -104,12 +107,12 @@ export default function CustomersPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Corporate Clients</p>
-          <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">{customers.length}</p>
+          <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">{summary?.total_customers ?? meta?.total ?? customers.length}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Invoiced (KES)</p>
           <p className="text-2xl font-bold text-primary mt-1 tabular-nums">
-            {formatKES(customers.reduce((sum, c) => sum + (c.total_invoiced || 0), 0))}
+            {formatKES(summary?.total_invoiced ?? 0)}
           </p>
         </Card>
         <Card className="p-4 border-destructive/30">
@@ -120,17 +123,29 @@ export default function CustomersPage() {
         </Card>
       </div>
 
-      {/* Search Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search customer name or phone..."
+            placeholder="Search name, phone, email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="pl-9 h-9 text-xs"
           />
         </div>
+        <select
+          value={hasBalance}
+          onChange={(e) => { setHasBalance(e.target.value); setPage(1); }}
+          className="h-9 rounded-md border border-input bg-card px-2 text-xs text-foreground"
+        >
+          <option value="">All balances</option>
+          <option value="yes">Has balance</option>
+          <option value="no">No balance</option>
+        </select>
+        {(search || hasBalance) && (
+          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setHasBalance(''); setPage(1); }}>Clear</Button>
+        )}
       </div>
 
       {/* Customer Directory with Ageing Buckets Table */}
@@ -140,11 +155,11 @@ export default function CustomersPage() {
             <Skeleton key={i} className="h-16 w-full rounded-xl" />
           ))}
         </div>
-      ) : filteredCustomers.length === 0 ? (
+      ) : customers.length === 0 ? (
         <EmptyState
           icon={<Building2 className="h-8 w-8" />}
           title="No customers found"
-          description={search ? 'No client matches your search.' : 'Add your first customer to bill trips.'}
+          description={search || hasBalance ? 'No client matches your filters.' : 'Add your first customer to bill trips.'}
           actionLabel="Add Customer"
           onAction={() => setSheetOpen(true)}
         />
@@ -157,7 +172,6 @@ export default function CustomersPage() {
                 <th className="py-3 px-4 text-left font-medium">Terms</th>
                 <th className="py-3 px-4 text-right font-medium">Total Billed</th>
                 <th className="py-3 px-4 text-right font-semibold text-destructive">Balance Owed</th>
-                {/* Ageing Buckets as requested by prompt */}
                 <th className="py-3 px-3 text-right font-medium text-xs">Current</th>
                 <th className="py-3 px-3 text-right font-medium text-xs">1–30d</th>
                 <th className="py-3 px-3 text-right font-medium text-xs">31–60d</th>
@@ -165,7 +179,7 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredCustomers.map((cust) => (
+              {customers.map((cust) => (
                 <tr key={cust.id} className="hover:bg-muted/40 transition-colors">
                   <td className="py-3.5 px-4">
                     <p className="font-semibold text-foreground text-sm">{cust.name}</p>
@@ -205,6 +219,13 @@ export default function CustomersPage() {
               ))}
             </tbody>
           </table>
+          <div className="flex items-center justify-between p-3 border-t border-border text-xs">
+            <span className="text-muted-foreground">Page {meta?.current_page ?? page} of {meta?.last_page ?? 1} • {meta?.total ?? customers.length} customers</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={(meta?.current_page ?? page) <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
+              <Button size="sm" variant="outline" disabled={(meta?.current_page ?? page) >= (meta?.last_page ?? 1)} onClick={() => setPage((p) => p + 1)}>Next</Button>
+            </div>
+          </div>
         </div>
       )}
 
