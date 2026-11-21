@@ -56,6 +56,9 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { user: currentUser, isOwner } = useAuth();
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
+  const [usersPage, setUsersPage] = useState(1);
+  const [auditPage, setAuditPage] = useState(1);
+  const [rulesPage, setRulesPage] = useState(1);
 
   // Edit / Delete user state (owner only)
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -165,14 +168,18 @@ export default function SettingsPage() {
     queryFn: () => api.get<{ data: Organization }>('/settings/organization'),
   });
 
-  const { data: usersData, isLoading: isUsersLoading } = useQuery<{ data: User[] }>({
-    queryKey: ['settings-users'],
-    queryFn: () => api.get<{ data: User[] }>('/settings/users'),
+  type Paginated<T> = { data: T[]; current_page?: number; last_page?: number; per_page?: number; total?: number; meta?: any };
+
+  const { data: usersData, isLoading: isUsersLoading } = useQuery<Paginated<User>>({
+    queryKey: ['settings-users', usersPage],
+    queryFn: () => api.get<Paginated<User>>(`/settings/users?per_page=10&page=${usersPage}`),
+    placeholderData: (prev) => prev,
   });
 
-  const { data: auditData, isLoading: isAuditLoading } = useQuery<{ data: AuditLog[] }>({
-    queryKey: ['settings-audit-logs'],
-    queryFn: () => api.get<{ data: AuditLog[] }>('/settings/audit-logs'),
+  const { data: auditData, isLoading: isAuditLoading } = useQuery<Paginated<AuditLog>>({
+    queryKey: ['settings-audit-logs', auditPage],
+    queryFn: () => api.get<Paginated<AuditLog>>(`/settings/audit-logs?per_page=15&page=${auditPage}`),
+    placeholderData: (prev) => prev,
   });
 
   const { data: rulesData, isLoading: isRulesLoading } = useQuery<{
@@ -190,10 +197,17 @@ export default function SettingsPage() {
     queryFn: () => api.get('/settings/rule-thresholds'),
   });
   const rules = rulesData?.data || {};
+  const ruleEntries = Object.entries(rules);
+  const rulesPerPage = 10;
+  const rulesLastPage = Math.max(1, Math.ceil(ruleEntries.length / rulesPerPage));
+  const safeRulesPage = Math.min(rulesPage, rulesLastPage);
+  const pagedRuleEntries = ruleEntries.slice((safeRulesPage - 1) * rulesPerPage, safeRulesPage * rulesPerPage);
 
   const org = orgData?.data;
   const teamMembers = usersData?.data || [];
   const auditLogs = auditData?.data || [];
+  const usersMeta = usersData?.meta ?? usersData;
+  const auditMeta = auditData?.meta ?? auditData;
 
   // Org form state
   const [orgName, setOrgName] = useState('');
@@ -271,7 +285,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="organization" className="w-full">
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto p-1">
           <TabsTrigger value="organization">Organization</TabsTrigger>
-          <TabsTrigger value="users">Team &amp; Roles ({teamMembers.length})</TabsTrigger>
+          <TabsTrigger value="users">Team &amp; Roles ({usersMeta?.total ?? teamMembers.length})</TabsTrigger>
           <TabsTrigger value="thresholds">Alert Thresholds</TabsTrigger>
           <TabsTrigger value="data-quality">Data Quality Rules (13)</TabsTrigger>
           <TabsTrigger value="audit">System Audit Logs</TabsTrigger>
@@ -549,6 +563,13 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="flex items-center justify-between p-3 border-t border-border text-xs">
+                <span className="text-muted-foreground">Page {usersMeta?.current_page ?? usersPage} of {usersMeta?.last_page ?? 1} • {usersMeta?.total ?? teamMembers.length} users</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={(usersMeta?.current_page ?? usersPage) <= 1} onClick={() => setUsersPage((p) => Math.max(1, p - 1))}>Prev</Button>
+                  <Button size="sm" variant="outline" disabled={(usersMeta?.current_page ?? usersPage) >= (usersMeta?.last_page ?? 1)} onClick={() => setUsersPage((p) => p + 1)}>Next</Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -633,7 +654,7 @@ export default function SettingsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {Object.entries(rules).map(([key, rule]) => {
+                    {pagedRuleEntries.map(([key, rule]) => {
                       const canEdit = currentUser?.role === 'owner' || currentUser?.role === 'manager';
                       return (
                         <tr key={key} className="hover:bg-muted/40 transition-colors">
@@ -701,6 +722,13 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="flex items-center justify-between p-3 border-t border-border text-xs">
+                <span className="text-muted-foreground">Page {safeRulesPage} of {rulesLastPage} • {ruleEntries.length} rules</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={safeRulesPage <= 1} onClick={() => setRulesPage((p) => Math.max(1, p - 1))}>Prev</Button>
+                  <Button size="sm" variant="outline" disabled={safeRulesPage >= rulesLastPage} onClick={() => setRulesPage((p) => Math.min(rulesLastPage, p + 1))}>Next</Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -746,6 +774,13 @@ export default function SettingsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="flex items-center justify-between p-3 border-t border-border text-xs">
+                <span className="text-muted-foreground">Page {auditMeta?.current_page ?? auditPage} of {auditMeta?.last_page ?? 1} • {auditMeta?.total ?? auditLogs.length} logs</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={(auditMeta?.current_page ?? auditPage) <= 1} onClick={() => setAuditPage((p) => Math.max(1, p - 1))}>Prev</Button>
+                  <Button size="sm" variant="outline" disabled={(auditMeta?.current_page ?? auditPage) >= (auditMeta?.last_page ?? 1)} onClick={() => setAuditPage((p) => p + 1)}>Next</Button>
+                </div>
               </div>
             </CardContent>
           </Card>
