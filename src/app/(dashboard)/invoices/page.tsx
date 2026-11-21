@@ -203,11 +203,12 @@ export default function InvoicesPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard title="Invoices (Filtered)" value={data?.total ?? 0} subtitle={`${stats?.overdue ?? 0} overdue`} icon={<FileText className="h-4 w-4" />} />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <StatCard title="Invoices" value={data?.total ?? 0} subtitle={`${stats?.overdue ?? 0} overdue`} icon={<FileText className="h-4 w-4" />} />
         <StatCard title="Total Invoiced" value={formatKES(summary?.total_amount ?? 0)} subtitle="Filtered set" icon={<Building2 className="h-4 w-4" />} />
         <StatCard title="Total Received" value={formatKES(summary?.total_paid ?? 0)} subtitle="Valid payments" icon={<DollarSign className="h-4 w-4" />} valueClassName="text-success font-semibold" />
-        <StatCard title="Outstanding" value={formatKES(summary?.outstanding ?? 0)} subtitle="Due after credits" icon={<FileBadge className="h-4 w-4" />} valueClassName={(summary?.outstanding ?? 0) > 0 ? 'text-destructive font-semibold' : undefined} />
+        <StatCard title="Credit Notes" value={formatKES(summary?.total_credited ?? 0)} subtitle="Applied credits" icon={<FileBadge className="h-4 w-4" />} />
+        <StatCard title="Outstanding" value={formatKES(summary?.outstanding ?? 0)} subtitle="Invoiced - paid - credits" icon={<FileBadge className="h-4 w-4" />} valueClassName={(summary?.outstanding ?? 0) > 0 ? 'text-destructive font-semibold' : undefined} />
       </div>
 
       <div className="space-y-3">
@@ -431,9 +432,10 @@ export default function InvoicesPage() {
           </DialogHeader>
           {detailsModalInvoice && (
             <div className="space-y-5 py-2 text-xs">
-              <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-secondary/60 border border-border">
+              <div className="grid grid-cols-4 gap-2 p-3 rounded-lg bg-secondary/60 border border-border">
                 <div><span className="text-muted-foreground block text-[11px]">Invoice Total</span><span className="font-mono font-bold text-sm text-foreground">{formatKES(detailsModalInvoice.amount)}</span></div>
                 <div><span className="text-muted-foreground block text-[11px]">Valid Paid</span><span className="font-mono font-bold text-sm text-success">{formatKES(detailsModalInvoice.total_paid)}</span></div>
+                <div><span className="text-muted-foreground block text-[11px]">Credit Notes</span><span className="font-mono font-bold text-sm text-foreground">{formatKES(detailsModalInvoice.total_credited ?? 0)}</span></div>
                 <div><span className="text-muted-foreground block text-[11px]">Balance Due</span><span className="font-mono font-bold text-sm text-destructive">{formatKES(detailsModalInvoice.balance_due)}</span></div>
               </div>
               <div className="space-y-2">
