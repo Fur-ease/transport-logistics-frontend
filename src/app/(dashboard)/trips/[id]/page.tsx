@@ -94,7 +94,10 @@ const expenseSchema = z.object({
 type ExpenseFormData = z.infer<typeof expenseSchema>;
 
 interface TripPnLResponse {
+  agreed_revenue?: number;
+  credit_note_amount?: number;
   revenue: number;
+  net_revenue?: number;
   approved_direct_costs: number;
   pending_costs: number;
   contribution: number;
@@ -470,7 +473,7 @@ export default function TripDetailPage() {
         }
         description={
           <p className="text-sm md:text-base font-medium text-foreground mt-1 max-w-3xl">
-            {trip.customer?.name} • Cargo: {trip.cargo_description} ({trip.cargo_weight_tons} tons) • Rate: {formatKES(trip.agreed_rate)}
+            {trip.customer?.name} • Cargo: {trip.cargo_description} ({trip.cargo_weight_tons} tons) • Agreed: {formatKES(trip.agreed_rate)}{(trip.credit_note_amount ?? 0) > 0 ? ` • CN: ${formatKES(trip.credit_note_amount ?? 0)} • Net: ${formatKES(trip.net_revenue ?? trip.agreed_rate)}` : ''}
           </p>
         }
         breadcrumbs={[
@@ -904,10 +907,17 @@ export default function TripDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-5 space-y-4 text-xs">
-                {/* Agreed Rate */}
                 <div className="flex items-center justify-between py-2 border-b border-border/60">
-                  <span className="text-muted-foreground font-medium">Agreed Revenue Rate</span>
-                  <MoneyText amount={pnl?.revenue ?? trip.agreed_rate} size="lg" />
+                  <span className="text-muted-foreground font-medium">Agreed Revenue</span>
+                  <MoneyText amount={pnl?.agreed_revenue ?? trip.agreed_rate} size="base" />
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-border/60">
+                  <span className="text-muted-foreground font-medium">Credit Notes</span>
+                  <MoneyText amount={pnl?.credit_note_amount ?? trip.credit_note_amount ?? 0} variant="negative" size="base" />
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-border/60">
+                  <span className="text-muted-foreground font-medium">Net Revenue</span>
+                  <MoneyText amount={pnl?.revenue ?? trip.net_revenue ?? trip.agreed_rate} size="lg" />
                 </div>
 
                 {/* Direct Expenses Breakdown */}
@@ -954,7 +964,7 @@ export default function TripDetailPage() {
 
                 {/* Mandatory East African Transporter Disclaimer */}
                 <div className="p-3 rounded-lg bg-secondary/80 border border-border text-[11px] text-muted-foreground leading-relaxed">
-                  <strong>Accounting Note:</strong> Contribution reflects revenue minus approved direct haulage costs. Shared fleet overheads (insurance, yard rent, finance interest) are excluded.
+                  <strong>Accounting Note:</strong> Contribution reflects net revenue (agreed rate minus applied credit notes) minus approved direct haulage costs. Shared fleet overheads are excluded.
                 </div>
               </CardContent>
             </Card>

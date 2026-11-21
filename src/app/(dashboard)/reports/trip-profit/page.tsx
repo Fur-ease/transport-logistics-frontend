@@ -469,14 +469,14 @@ export default function TripProfitSheetPage() {
           subtitle={summary?.total_km ? `${formatKm(summary.total_km)} total` : 'Direct deliveries'}
         />
         <StatCard
-          title="Total Revenue"
+          title="Net Revenue"
           value={isLoading ? '...' : formatKES(summary?.revenue || 0)}
-          subtitle="Agreed transport rates"
+          subtitle={`Agreed ${formatKES(summary?.agreed_revenue || 0)} • CN ${formatKES(summary?.credit_note_amount || 0)}`}
         />
         <StatCard
           title="Direct Trip Costs"
           value={isLoading ? '...' : formatKES(summary?.total_direct_costs || 0)}
-          subtitle="Fuel, allowances &amp; levies"
+          subtitle="Approved direct costs"
         />
         <StatCard
           title="Total Contribution"
@@ -484,7 +484,7 @@ export default function TripProfitSheetPage() {
           valueClassName={
             (summary?.contribution || 0) < 0 ? 'text-destructive font-bold' : 'text-success font-bold'
           }
-          subtitle="Revenue minus direct costs"
+          subtitle="Net revenue minus direct costs"
         />
         <StatCard
           title="Contribution Margin"
@@ -512,7 +512,7 @@ export default function TripProfitSheetPage() {
         <div className="flex items-center gap-2 text-foreground">
           <Info className="h-4 w-4 text-primary shrink-0" />
           <span>
-            <strong>Calculation Rule:</strong> Contribution = revenue minus approved direct trip costs (fuel, allowances, tolls/cess, border fees, direct repairs). Shared depot overheads and truck depreciation are not deducted.
+            <strong>Calculation Rule:</strong> Contribution = net revenue (agreed rate minus applied credit notes) minus approved direct trip costs. Shared depot overheads and truck depreciation are not deducted.
           </span>
         </div>
         {summary && summary.pending_expenses_count > 0 && (
@@ -546,7 +546,9 @@ export default function TripProfitSheetPage() {
                     <th className="py-2.5 px-3 text-left font-medium">Truck Reg</th>
                     <th className="py-2.5 px-3 text-center font-medium">Trips Made</th>
                     <th className="py-2.5 px-3 text-right font-medium">Total Distance</th>
-                    <th className="py-2.5 px-3 text-right font-medium">Revenue</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Agreed</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Credit Note</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Net Revenue</th>
                     <th className="py-2.5 px-3 text-right font-medium">Direct Costs</th>
                     <th className="py-2.5 px-3 text-right font-medium">Contribution</th>
                     <th className="py-2.5 px-3 text-right font-medium">Margin %</th>
@@ -563,6 +565,8 @@ export default function TripProfitSheetPage() {
                       </td>
                       <td className="py-2 px-3 text-center tabular-nums font-medium">{ts.trips_made}</td>
                       <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{formatKm(ts.total_km)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{formatKES(ts.agreed_revenue ?? ts.revenue)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{formatKES(ts.credit_note_amount ?? 0)}</td>
                       <td className="py-2 px-3 text-right tabular-nums font-medium">{formatKES(ts.revenue)}</td>
                       <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{formatKES(ts.direct_costs)}</td>
                       <td
@@ -622,12 +626,14 @@ export default function TripProfitSheetPage() {
                   </th>
                   <th className="py-3 px-3 text-left font-medium">Truck &amp; Driver</th>
                   <th className="py-3 px-3 text-left font-medium">Customer &amp; Route</th>
+                  <th className="py-3 px-3 text-right font-medium text-muted-foreground">Agreed</th>
+                  <th className="py-3 px-3 text-right font-medium text-muted-foreground">Credit Note</th>
                   <th
                     className="py-3 px-3 text-right font-medium cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('revenue')}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      <span>Revenue</span>
+                      <span>Net Revenue</span>
                       <ArrowUpDown className="h-3 w-3" />
                     </div>
                   </th>
@@ -668,14 +674,14 @@ export default function TripProfitSheetPage() {
                 {isLoading ? (
                   [...Array(6)].map((_, i) => (
                     <tr key={i}>
-                      <td colSpan={12} className="p-4">
+                      <td colSpan={14} className="p-4">
                         <Skeleton className="h-5 w-full" />
                       </td>
                     </tr>
                   ))
                 ) : sortedTrips.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-10 text-center text-muted-foreground">
+                    <td colSpan={14} className="py-10 text-center text-muted-foreground">
                       No delivery trips matched the selected filters.
                     </td>
                   </tr>
@@ -709,6 +715,8 @@ export default function TripProfitSheetPage() {
                           {row.route}
                         </div>
                       </td>
+                      <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground">{formatKES(row.agreed_revenue ?? row.revenue)}</td>
+                      <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground">{formatKES(row.credit_note_amount ?? 0)}</td>
                       <td className="py-2.5 px-3 text-right tabular-nums font-semibold text-foreground">
                         {formatKES(row.revenue)}
                       </td>
@@ -756,6 +764,12 @@ export default function TripProfitSheetPage() {
                   <tr>
                     <td colSpan={4} className="py-3 px-3 uppercase tracking-wider text-xs">
                       Grand Totals ({summary.trips_count} trips)
+                    </td>
+                    <td className="py-3 px-3 text-right tabular-nums text-xs font-mono text-muted-foreground">
+                      {formatKES(summary.agreed_revenue ?? summary.revenue)}
+                    </td>
+                    <td className="py-3 px-3 text-right tabular-nums text-xs font-mono text-muted-foreground">
+                      {formatKES(summary.credit_note_amount ?? 0)}
                     </td>
                     <td className="py-3 px-3 text-right tabular-nums text-xs font-mono">
                       {formatKES(summary.revenue)}

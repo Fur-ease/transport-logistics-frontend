@@ -110,45 +110,45 @@ export default function ReportsPage() {
 
         <TabsContent value="trips_per_truck" className="space-y-4 mt-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Fleet</span><p className="text-xl font-bold mt-1">{tpt?.summary?.total_trucks ?? 0}</p></Card>
-            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Trips</span><p className="text-xl font-bold text-primary mt-1">{tpt?.summary?.total_trips_made ?? 0}</p></Card>
-            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Distance</span><p className="text-xl font-mono font-bold mt-1">{formatKm(tpt?.summary?.total_km ?? 0)}</p></Card>
-            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_revenue ?? 0)}</p></Card>
+            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Agreed</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_agreed_revenue ?? tpt?.summary?.total_revenue ?? 0)}</p></Card>
+            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Credit Notes</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_credit_notes ?? 0)}</p></Card>
+            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Net Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_revenue ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Direct Costs</span><p className="text-xl font-mono font-bold text-destructive mt-1">{formatKES(tpt?.summary?.total_expenses ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Contribution</span><p className="text-xl font-mono font-bold text-success mt-1">{formatKES(tpt?.summary?.total_contribution ?? 0)}</p></Card>
+            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Trips</span><p className="text-xl font-bold text-primary mt-1">{tpt?.summary?.total_trips_made ?? 0}</p></Card>
           </div>
-          <Card><CardHeader className="pb-2"><CardTitle>Trips Completed per Truck</CardTitle><CardDescription>Completed in period (delivered/invoiced/paid), contribution from approved direct expenses</CardDescription></CardHeader>
+          <Card><CardHeader className="pb-2"><CardTitle>Trips Completed per Truck</CardTitle><CardDescription>Contribution from net revenue (agreed minus applied credit notes) minus approved direct expenses</CardDescription></CardHeader>
             <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
-              <th className="py-3 px-4 text-left">Reg</th><th className="py-3 px-4 text-left">Vehicle</th><th className="py-3 px-4 text-center font-bold text-primary">Trips</th><th className="py-3 px-4 text-right">KM</th><th className="py-3 px-4 text-right">Revenue</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-center">Util %</th><th className="py-3 px-4 text-right">Idle</th>
+              <th className="py-3 px-4 text-left">Reg</th><th className="py-3 px-4 text-center font-bold text-primary">Trips</th><th className="py-3 px-4 text-right">Agreed</th><th className="py-3 px-4 text-right">CN</th><th className="py-3 px-4 text-right">Net Rev</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-center">Util %</th>
             </tr></thead><tbody className="divide-y divide-border">
-              {tptLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={9} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
+              {tptLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={8} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
               paged.rows.map((truck:any)=>(
                 <tr key={truck.truck_id} className="hover:bg-muted/40"><td className="py-3.5 px-4 font-mono font-bold text-primary"><Link href={`/trucks/${truck.truck_id}`} className="hover:underline">{truck.reg_number}</Link></td>
-                  <td className="py-3.5 px-4"><p className="font-semibold text-xs">{truck.make} {truck.model}</p><p className="text-[11px] text-muted-foreground">{truck.capacity_tons}T • {truck.status}</p></td>
                   <td className="py-3.5 px-4 text-center"><span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{truck.trips_made}</span></td>
-                  <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKm(truck.total_km)}</td>
+                  <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.agreed_revenue ?? truck.revenue)}</td>
+                  <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.credit_note_amount ?? 0)}</td>
                   <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.revenue)}</td>
                   <td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">{formatKES(truck.expenses)}</td>
                   <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-success">{formatKES(truck.contribution)}</td>
-                  <td className="py-3.5 px-4 text-center text-xs font-semibold">{truck.utilisation_pct}%</td>
-                  <td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">{truck.days_since_last_trip!=null?`${truck.days_since_last_trip}d`:'N/A'}</td></tr>
+                  <td className="py-3.5 px-4 text-center text-xs font-semibold">{truck.utilisation_pct}%</td></tr>
               ))}
             </tbody></table></div></CardContent></Card>
         </TabsContent>
 
         <TabsContent value="profitability" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Completed Trips</span><p className="text-xl font-bold mt-1">{profData?.summary?.total_completed_trips ?? 0}</p></Card>
-            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_revenue ?? 0)}</p></Card>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Agreed</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_agreed_revenue ?? profData?.summary?.total_revenue ?? 0)}</p></Card>
+            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Credit Notes</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_credit_notes ?? 0)}</p></Card>
+            <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Net Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_revenue ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Direct Costs</span><p className="text-xl font-mono font-bold text-destructive mt-1">{formatKES(profData?.summary?.total_direct_costs ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Contribution</span><p className="text-xl font-mono font-bold text-success mt-1">{formatKES(profData?.summary?.total_contribution ?? 0)}</p></Card>
           </div>
-          <Card><CardHeader className="pb-2"><CardTitle>Trip Contribution Breakdown</CardTitle><CardDescription>{profData?.summary?.note || 'Revenue minus approved direct trip expenses.'}</CardDescription></CardHeader>
+          <Card><CardHeader className="pb-2"><CardTitle>Trip Contribution Breakdown</CardTitle><CardDescription>{profData?.summary?.note || 'Net revenue minus approved direct trip expenses.'}</CardDescription></CardHeader>
             <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
-              <th className="py-3 px-4 text-left">Trip</th><th className="py-3 px-4 text-right">KM</th><th className="py-3 px-4 text-right">Revenue</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-right">Margin</th><th className="py-3 px-4 text-right">KES/KM</th>
+              <th className="py-3 px-4 text-left">Trip</th><th className="py-3 px-4 text-right">Agreed</th><th className="py-3 px-4 text-right">CN</th><th className="py-3 px-4 text-right">Net Rev</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-right">Margin</th>
             </tr></thead><tbody className="divide-y divide-border">
               {profLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
-              paged.rows.map((t:any)=>(<tr key={t.trip_id} className="hover:bg-muted/40"><td className="py-3.5 px-4 font-mono font-bold text-primary"><Link href={`/trips/${t.trip_id}`} className="hover:underline inline-flex items-center gap-1">{t.reference}<ArrowUpRight className="h-3 w-3"/></Link></td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKm(t.distance_km)}</td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.revenue)}</td><td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">{formatKES(t.approved_direct_costs)}</td><td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-success">{formatKES(t.contribution)}</td><td className="py-3.5 px-4 text-right font-mono text-xs font-semibold">{t.contribution_margin_pct}%</td><td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">{t.contribution_per_km}</td></tr>))}
+              paged.rows.map((t:any)=>(<tr key={t.trip_id} className="hover:bg-muted/40"><td className="py-3.5 px-4 font-mono font-bold text-primary"><Link href={`/trips/${t.trip_id}`} className="hover:underline inline-flex items-center gap-1">{t.reference}<ArrowUpRight className="h-3 w-3"/></Link></td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.agreed_revenue ?? t.revenue)}</td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.credit_note_amount ?? 0)}</td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.revenue)}</td><td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">{formatKES(t.approved_direct_costs)}</td><td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-success">{formatKES(t.contribution)}</td><td className="py-3.5 px-4 text-right font-mono text-xs font-semibold">{t.contribution_margin_pct}%</td></tr>))}
             </tbody></table></div></CardContent></Card>
         </TabsContent>
 

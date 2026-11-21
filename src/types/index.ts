@@ -178,6 +178,8 @@ export interface Trip {
   cargo_description: string;
   cargo_weight_tons: number;
   agreed_rate: number;
+  credit_note_amount?: number;
+  net_revenue?: number;
   start_date: string;
   end_date?: string | null;
   start_odometer: number;
@@ -401,7 +403,10 @@ export interface DashboardStats {
   kpis: {
     active_trips: number;
     trips_this_month: number;
+    agreed_revenue?: number;
+    credit_note_amount?: number;
     revenue: number;
+    net_revenue?: number;
     direct_costs: number;
     contribution: number;
     contribution_margin_pct: number;
@@ -440,7 +445,10 @@ export interface TruckReportStat {
   };
   trips_made: number;
   total_km: number;
+  agreed_revenue?: number;
+  credit_note_amount?: number;
   revenue: number;
+  net_revenue?: number;
   expenses: number;
   contribution: number;
   days_on_trip: number;
@@ -458,7 +466,10 @@ export interface TripsPerTruckReport {
     total_trucks: number;
     total_trips_made: number;
     total_km: number;
+    total_agreed_revenue?: number;
+    total_credit_notes?: number;
     total_revenue: number;
+    total_net_revenue?: number;
     total_expenses: number;
     total_contribution: number;
     average_utilisation_pct: number;
@@ -569,7 +580,10 @@ export interface TripProfitRow {
   driver_name: string;
   customer_name: string;
   route: string;
+  agreed_revenue?: number;
+  credit_note_amount?: number;
   revenue: number;
+  net_revenue?: number;
   fuel: number;
   allowance: number;
   tolls_levies: number;
@@ -585,7 +599,10 @@ export interface TripProfitRow {
 
 export interface TripProfitSummary {
   trips_count: number;
+  agreed_revenue?: number;
+  credit_note_amount?: number;
   revenue: number;
+  net_revenue?: number;
   fuel_cost: number;
   allowance_cost: number;
   tolls_levies_cost: number;
@@ -611,7 +628,10 @@ export interface TruckSummary {
   truck_id: number;
   trips_made: number;
   total_km: number;
+  agreed_revenue?: number;
+  credit_note_amount?: number;
   revenue: number;
+  net_revenue?: number;
   direct_costs: number;
   contribution: number;
   margin_pct: number | null;

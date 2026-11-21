@@ -323,9 +323,9 @@ export default function TruckDetailPage() {
           icon={<MapPin className="h-5 w-5" />}
         />
         <StatCard
-          title="Total Revenue (KES)"
+          title="Net Revenue (KES)"
           value={formatKES(stats?.revenue ?? 0)}
-          subtitle="From customer billing"
+          subtitle={`Agreed ${formatKES(stats?.agreed_revenue ?? stats?.revenue ?? 0)} • CN ${formatKES(stats?.credit_note_amount ?? 0)}`}
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <StatCard
@@ -338,7 +338,7 @@ export default function TruckDetailPage() {
         <StatCard
           title="Trip Contribution"
           value={formatKES(stats?.contribution ?? 0)}
-          subtitle={`${stats?.utilisation_pct ?? 0}% Fleet Utilisation`}
+          subtitle={`Net revenue minus direct costs • ${stats?.utilisation_pct ?? 0}% util`}
           icon={<Layers className="h-5 w-5" />}
           valueClassName="text-success font-semibold"
         />

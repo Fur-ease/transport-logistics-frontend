@@ -650,7 +650,9 @@ export default function TripsPage() {
                 <th className="py-3 px-4 text-left font-medium">Truck, Trailer & Driver</th>
                 <th className="py-3 px-4 text-left font-medium">Customer & Cargo</th>
                 <th className="py-3 px-4 text-left font-medium">Documents</th>
-                <th className="py-3 px-4 text-right font-medium">Revenue (KES)</th>
+                <th className="py-3 px-4 text-right font-medium">Agreed</th>
+                <th className="py-3 px-4 text-right font-medium">CN</th>
+                <th className="py-3 px-4 text-right font-medium">Net Rev</th>
                 <th className="py-3 px-4 text-right font-medium">Direct Costs</th>
                 <th className="py-3 px-4 text-right font-semibold text-success">Contribution</th>
                 <th className="py-3 px-4 text-center font-medium">Status</th>
@@ -715,16 +717,11 @@ export default function TripsPage() {
                       )}
                     </div>
                   </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <MoneyText amount={trip.agreed_rate} size="base" />
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <MoneyText amount={trip.approved_expenses_total} variant="negative" size="base" />
-                  </td>
-                  {/* Trip P&L Contribution = Revenue - Approved Direct Expenses */}
-                  <td className="py-3.5 px-4 text-right">
-                    <MoneyText amount={trip.contribution} variant="positive" size="base" />
-                  </td>
+                  <td className="py-3.5 px-4 text-right"><MoneyText amount={trip.agreed_rate} size="base" /></td>
+                  <td className="py-3.5 px-4 text-right"><MoneyText amount={trip.credit_note_amount ?? 0} size="base" /></td>
+                  <td className="py-3.5 px-4 text-right"><MoneyText amount={trip.net_revenue ?? (trip.agreed_rate - (trip.credit_note_amount ?? 0))} size="base" /></td>
+                  <td className="py-3.5 px-4 text-right"><MoneyText amount={trip.approved_expenses_total} variant="negative" size="base" /></td>
+                  <td className="py-3.5 px-4 text-right"><MoneyText amount={trip.contribution} variant={trip.contribution < 0 ? 'negative' : 'positive'} size="base" /></td>
                   <td className="py-3.5 px-4 text-center">
                     <StatusBadge status={trip.status} />
                   </td>

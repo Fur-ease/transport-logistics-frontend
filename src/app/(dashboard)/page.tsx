@@ -226,22 +226,22 @@ export default function DashboardPage() {
             icon={<Truck className="h-5 w-5" />}
           />
           <StatCard
-            title="Agreed Revenue"
+            title="Net Revenue"
             value={formatKES(stats?.kpis.revenue ?? 0)}
-            subtitle="Agreed (in-transit & completed, period)"
+            subtitle={`Agreed ${formatKES(stats?.kpis.agreed_revenue ?? stats?.kpis.revenue ?? 0)} • CN ${formatKES(stats?.kpis.credit_note_amount ?? 0)}`}
             icon={<TrendingUp className="h-5 w-5" />}
           />
           <StatCard
             title="Direct Trip Costs"
             value={formatKES(stats?.kpis.direct_costs ?? 0)}
-            subtitle="Fuel, allowances, tolls, cess"
+            subtitle="Approved direct costs"
             icon={<Receipt className="h-5 w-5" />}
             valueClassName="text-destructive font-semibold"
           />
           <StatCard
             title="Fleet Contribution"
             value={formatKES(stats?.kpis.contribution ?? 0)}
-            subtitle={`${stats?.kpis.contribution_margin_pct ?? 0}% margin (excl. overheads)`}
+            subtitle={`${stats?.kpis.contribution_margin_pct ?? 0}% margin on net revenue`}
             icon={<Layers className="h-5 w-5" />}
             valueClassName="text-success font-semibold"
           />
@@ -339,7 +339,7 @@ export default function DashboardPage() {
                                 Completed Trips: <span className="font-semibold text-foreground">{item.trips}</span>
                               </p>
                               <p className="text-muted-foreground">
-                                Revenue: <span className="font-mono text-foreground">{formatKES(item.revenue)}</span>
+                                Net Revenue: <span className="font-mono text-foreground">{formatKES(item.revenue)}</span>
                               </p>
                               <p className="text-muted-foreground">
                                 Contribution:{' '}
@@ -394,7 +394,7 @@ export default function DashboardPage() {
               <TrendingUp className="h-4 w-4" />
               <span>Top Trucks by Contribution</span>
             </CardTitle>
-            <CardDescription>Highest contribution (revenue âˆ’ approved direct costs) in period</CardDescription>
+            <CardDescription>Highest contribution (net revenue âˆ’ approved direct costs) in period</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border max-h-80 overflow-auto">
