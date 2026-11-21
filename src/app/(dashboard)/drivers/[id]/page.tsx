@@ -1,34 +1,46 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Users,
-  MapPin,
-  CreditCard,
-  FileCheck,
-  Phone,
-  Shield,
-  Clock,
-  ArrowUpRight,
-  AlertTriangle,
-} from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'sonner';
+import { FileCheck, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { MoneyText } from '@/components/shared/MoneyText';
 import { HistoryTimeline } from '@/components/shared/HistoryTimeline';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/Sheet';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { api } from '@/lib/api';
-import { formatKES, formatKm, formatDate } from '@/lib/formatters';
+import { syncFinancialState } from '@/lib/liveSync';
+import { formatDate } from '@/lib/formatters';
 import { Driver } from '@/types';
+
+const driverSchema = z.object({
+  name: z.string().min(3, 'Driver full name is required'),
+  phone: z.string().min(10, 'Valid phone number required'),
+  licence_no: z.string().min(5, 'Valid driver licence number required'),
+  licence_expiry: z.string().min(1, 'Licence expiry date required'),
+  status: z.enum(['active', 'on_trip', 'on_leave', 'inactive']),
+});
+type DriverFormData = z.infer<typeof driverSchema>;
 
 export default function DriverDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const driverId = params.id as string;
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data, isLoading } = useQuery<{ data: Driver }>({
     queryKey: ['driver', driverId],
@@ -36,6 +48,40 @@ export default function DriverDetailPage() {
   });
 
   const driver = data?.data;
+  const editForm = useForm<DriverFormData>({ resolver: zodResolver(driverSchema) });
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: DriverFormData) => api.put(`/drivers/${driverId}`, { ...payload, version: driver?.version }),
+    onSuccess: async () => {
+      await syncFinancialState(queryClient);
+      toast.success('Driver updated');
+      setEditOpen(false);
+    },
+    onError: (err: Error) => toast.error(err.message || 'Failed to update driver'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete<{ message?: string }>(`/drivers/${driverId}`),
+    onSuccess: async (res) => {
+      await syncFinancialState(queryClient);
+      toast.success(res?.message || 'Driver removed');
+      setDeleteOpen(false);
+      router.push('/drivers');
+    },
+    onError: (err: Error) => toast.error(err.message || 'Failed to remove driver'),
+  });
+
+  const openEdit = () => {
+    if (!driver) return;
+    editForm.reset({
+      name: driver.name || '',
+      phone: driver.phone || '',
+      licence_no: driver.licence_no || '',
+      licence_expiry: driver.licence_expiry ? String(driver.licence_expiry).slice(0, 10) : '',
+      status: driver.status as DriverFormData['status'],
+    });
+    setEditOpen(true);
+  };
 
   if (isLoading || !driver) {
     return (
@@ -47,14 +93,9 @@ export default function DriverDetailPage() {
     );
   }
 
-  const isLicenceExpiringSoon = () => {
-    const diffDays = Math.ceil(
-      (new Date(driver.licence_expiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return diffDays <= 30;
-  };
-
-  const expiring = isLicenceExpiringSoon();
+  const licenceDays = Math.ceil((new Date(driver.licence_expiry).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const licenceExpired = licenceDays <= 0;
+  const licenceExpiringSoon = licenceDays > 0 && licenceDays <= 30;
 
   return (
     <div className="space-y-6">
@@ -67,7 +108,13 @@ export default function DriverDetailPage() {
           { label: 'Drivers Roster', href: '/drivers' },
           { label: driver.name },
         ]}
-        actions={<StatusBadge status={driver.status} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusBadge status={driver.status} />
+            <Button size="sm" variant="outline" onClick={openEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
+            <Button size="sm" variant="destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete</Button>
+          </div>
+        }
       />
 
       {/* Summary Profile Header */}
@@ -76,10 +123,15 @@ export default function DriverDetailPage() {
           <p className="text-xs uppercase font-medium text-muted-foreground">Driving Licence (NTSA)</p>
           <div className="flex items-center gap-2 mt-2">
             <span className="font-mono text-base font-bold text-foreground">{driver.licence_no}</span>
-            {expiring ? (
+            {licenceExpired ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-destructive/10 text-destructive border border-destructive/30">
+                <AlertTriangle className="h-3 w-3" />
+                <span>Expired {formatDate(driver.licence_expiry)}</span>
+              </span>
+            ) : licenceExpiringSoon ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning-bg text-warning-foreground border border-warning/30">
                 <AlertTriangle className="h-3 w-3" />
-                <span>Expires {formatDate(driver.licence_expiry)}</span>
+                <span>Expires in {licenceDays}d ({formatDate(driver.licence_expiry)})</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success-bg text-success-foreground border border-success/30">
@@ -250,6 +302,45 @@ export default function DriverDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+        <SheetContent side="right" className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Edit Driver</SheetTitle>
+            <SheetDescription>Update driver profile, licence, and status.</SheetDescription>
+          </SheetHeader>
+          <form onSubmit={editForm.handleSubmit((d) => updateMutation.mutate(d))} className="space-y-4 py-4">
+            <div><label className="text-xs font-semibold block mb-1">Full Name</label><Input {...editForm.register('name')} />{editForm.formState.errors.name && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.name.message}</p>}</div>
+            <div><label className="text-xs font-semibold block mb-1">Phone</label><Input {...editForm.register('phone')} />{editForm.formState.errors.phone && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.phone.message}</p>}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="text-xs font-semibold block mb-1">Licence #</label><Input {...editForm.register('licence_no')} className="font-mono uppercase" />{editForm.formState.errors.licence_no && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.licence_no.message}</p>}</div>
+              <div><label className="text-xs font-semibold block mb-1">Licence Expiry</label><Input type="date" {...editForm.register('licence_expiry')} />{editForm.formState.errors.licence_expiry && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.licence_expiry.message}</p>}</div>
+            </div>
+            <div><label className="text-xs font-semibold block mb-1">Status</label>
+              <select {...editForm.register('status')} className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm">
+                <option value="active">Active</option><option value="on_trip">On Trip</option><option value="on_leave">On Leave</option><option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <SheetFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={updateMutation.isPending}>Cancel</Button>
+              <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Remove Driver</DialogTitle>
+            <DialogDescription>Remove {driver.name}? Drivers with trip history will be deactivated instead of permanently deleted.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleteMutation.isPending}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>{deleteMutation.isPending ? 'Removing...' : 'Remove Driver'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

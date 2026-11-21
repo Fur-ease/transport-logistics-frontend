@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Truck,
@@ -21,6 +22,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 
 interface NavItem {
@@ -40,6 +42,14 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { user, isDriver } = useAuth();
+  const { data: driverAlerts } = useQuery<{ license_expired_count: number; license_expiring_soon_count: number }>({
+    queryKey: ['driver-alerts'],
+    queryFn: () => api.get('/drivers/alerts'),
+    enabled: !isDriver,
+    refetchInterval: 60000,
+  });
+  const licenseExpiredCount = driverAlerts?.license_expired_count ?? 0;
+  const licenseExpiringSoonCount = driverAlerts?.license_expiring_soon_count ?? 0;
 
   const navGroups: NavGroup[] = [
     {
@@ -131,22 +141,35 @@ export function Sidebar() {
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
+                const driversExpired = item.href === '/drivers' && licenseExpiredCount > 0;
+                const driversExpiring = item.href === '/drivers' && licenseExpiredCount === 0 && licenseExpiringSoonCount > 0;
+                const driversAlert = driversExpired || driversExpiring;
+                const alertTitle = driversExpired
+                  ? `${item.label}: ${licenseExpiredCount} expired license(s)`
+                  : driversExpiring
+                    ? `${item.label}: ${licenseExpiringSoonCount} license(s) expiring within 30 days`
+                    : undefined;
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    title={collapsed ? item.label : undefined}
+                    title={collapsed ? item.label : alertTitle}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative',
                       isActive
                         ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/70',
+                      driversExpired && !isActive && 'text-destructive bg-destructive/5',
+                      driversExpiring && !isActive && 'text-amber-600 bg-amber-500/10',
                       collapsed && 'justify-center px-0'
                     )}
                   >
-                    <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : 'text-muted-foreground')} />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
+                    <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-primary-foreground' : driversExpired ? 'text-destructive animate-pulse' : driversExpiring ? 'text-amber-500' : 'text-muted-foreground')} />
+                    {!collapsed && <span className={cn('truncate', driversAlert && !isActive && 'font-semibold')}>{item.label}</span>}
+                    {driversAlert && (
+                      <span className={cn('ml-auto h-2 w-2 rounded-full', driversExpired ? 'bg-destructive animate-pulse' : 'bg-amber-500', collapsed && 'absolute top-2 right-2 ml-0')} />
+                    )}
                   </Link>
                 );
               })}
