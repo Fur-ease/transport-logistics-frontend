@@ -162,7 +162,10 @@ interface TruckStatsResponse {
   capacity_tons: number;
   trips_made: number;
   total_km: number;
+  agreed_revenue?: number;
+  credit_note_amount?: number;
   revenue: number;
+  net_revenue?: number;
   expenses: number;
   contribution: number;
   utilisation_pct: number;

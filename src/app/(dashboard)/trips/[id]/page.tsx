@@ -1495,6 +1495,7 @@ export default function TripDetailPage() {
               {previewFile && (
                 <div className="max-h-[70vh] overflow-auto">
                   {previewFile.mime_type?.startsWith('image/') ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={previewFile.download_url}
                       alt={previewFile.original_name}
