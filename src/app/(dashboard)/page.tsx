@@ -474,7 +474,75 @@ export default function DashboardPage() {
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Mobile Recent Trips Cards View */}
+          <div className="block sm:hidden divide-y divide-border">
+            {isInitialLoad ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="p-4 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-44" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              ))
+            ) : !stats?.recent_trips?.length ? (
+              <div className="p-6 text-center text-xs text-muted-foreground">
+                No recent trips recorded.
+              </div>
+            ) : (
+              stats.recent_trips.map((trip) => (
+                <div key={trip.id} className="p-4 space-y-2.5 hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <Link
+                      href={`/trips/${trip.id}`}
+                      className="font-mono font-bold text-sm text-primary hover:underline"
+                    >
+                      {trip.reference}
+                    </Link>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={trip.status} />
+                      <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <Link href={`/trips/${trip.id}`} title="View details">
+                          <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-sm text-foreground">
+                      {trip.origin} → {trip.destination}
+                    </p>
+                    {trip.cargo_description && (
+                      <p className="text-xs text-muted-foreground truncate">{trip.cargo_description}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Truck / Driver</span>
+                      <span className="font-mono font-medium text-foreground">{trip.truck?.reg_number}</span>
+                      <span className="text-muted-foreground block truncate">{trip.driver?.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Customer</span>
+                      <span className="font-medium text-foreground truncate block">{trip.customer?.name}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-border/50 text-xs">
+                    <span className="text-muted-foreground">Agreed Rate:</span>
+                    <MoneyText amount={trip.agreed_rate} size="base" />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                 <tr>
