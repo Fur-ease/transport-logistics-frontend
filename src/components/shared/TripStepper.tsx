@@ -29,7 +29,7 @@ export function TripStepper({ currentStatus, className }: TripStepperProps) {
   const currentIndex = STEPS.findIndex((s) => s.key === currentStatus);
 
   return (
-    <div className={cn('w-full py-2 overflow-x-auto', className)}>
+    <div className={cn('w-full py-2 overflow-x-auto no-scrollbar', className)}>
       <div className="flex items-center justify-between min-w-[280px]">
         {STEPS.map((step, index) => {
           const isCompleted = currentIndex > index;

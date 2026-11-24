@@ -190,7 +190,100 @@ export default function DocumentsRegisterPage() {
       {/* Register Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Mobile Document Cards View */}
+          <div className="block sm:hidden divide-y divide-border">
+            {isLoading ? (
+              <div className="p-6 text-center text-xs text-muted-foreground">Loading documents...</div>
+            ) : documents.length === 0 ? (
+              <div className="py-12 text-center text-xs text-muted-foreground p-4">
+                <FileText className="mx-auto h-8 w-8 mb-2 opacity-30" />
+                <p className="font-medium text-foreground">No documents found</p>
+                <p className="text-xs mt-1">Try adjusting your search or filters.</p>
+              </div>
+            ) : (
+              documents.map((doc) => {
+                const isEir = doc.type === 'container_interchange';
+                const hasFiles = doc.files && doc.files.length > 0;
+
+                return (
+                  <div key={doc.id} className="p-4 space-y-2.5 hover:bg-muted/40 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                          {isEir ? <Package className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                          {isEir ? 'EIR' : 'DN'}
+                        </span>
+                        <span className="font-mono font-semibold text-foreground text-sm">
+                          {doc.document_number}
+                        </span>
+                      </div>
+                      <StatusBadge status={doc.status} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Trip Ref</span>
+                        {doc.trip ? (
+                          <Link href={`/trips/${doc.trip_id}`} className="text-primary hover:underline font-mono font-medium">
+                            {doc.trip.reference}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Trip #{doc.trip_id}</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Issued Date</span>
+                        <span className="text-foreground">{doc.issued_date}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Truck / Driver</span>
+                        <span className="font-mono text-foreground font-medium">{doc.trip?.truck?.reg_number ?? '—'}</span>
+                        <span className="text-muted-foreground block truncate">{doc.trip?.driver?.name ?? '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Container #</span>
+                        <span className="font-mono text-foreground">{doc.container_number || '—'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                      <div>
+                        {hasFiles ? (
+                          <span className="inline-flex items-center gap-1 font-medium text-xs text-foreground">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                            {doc.files!.length} {doc.files!.length === 1 ? 'file' : 'files'}
+                          </span>
+                        ) : (
+                          <span className="text-destructive font-medium text-xs">Missing file</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {hasFiles && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setPreviewFile(doc.files![0])}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            Preview
+                          </Button>
+                        )}
+                        <Link href={`/trips/${doc.trip_id}`}>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
+                            View Trip
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm min-w-[850px]">
               <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                 <tr>
@@ -337,7 +430,7 @@ export default function DocumentsRegisterPage() {
 
       {/* Scanned Document Preview Modal */}
       <Dialog open={previewFile !== null} onOpenChange={() => setPreviewFile(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{previewFile?.original_name}</DialogTitle>
           </DialogHeader>

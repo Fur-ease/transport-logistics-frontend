@@ -481,7 +481,7 @@ export default function TripDetailPage() {
           { label: trip.reference },
         ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -719,7 +719,163 @@ export default function TripDetailPage() {
                   </Button>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                  {/* Mobile Direct Expenses Cards */}
+                  <div className="block sm:hidden divide-y divide-border">
+                    {trip.expenses?.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        No direct expenses recorded yet for this trip.
+                      </div>
+                    ) : (
+                      trip.expenses?.map((exp) => {
+                        const receipts = (exp.receipts?.length ? exp.receipts : (exp as any).attachments) as any[] | undefined;
+                        return (
+                          <div key={exp.id} className="p-4 space-y-2.5 hover:bg-muted/40 transition-colors">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <span className="font-semibold text-sm text-foreground capitalize block">
+                                  {exp.category.replace(/_/g, ' ')}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {formatDateTime(exp.incurred_at)}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <MoneyText amount={exp.amount} size="base" />
+                                <div className="mt-0.5">
+                                  <StatusBadge status={exp.status} />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1 text-xs pt-1 border-t border-border/50">
+                              <p className="text-muted-foreground">
+                                Entered by {exp.entered_by_name || 'Staff'}
+                              </p>
+                              {(exp.litres != null || exp.odometer_at_fill != null) && (
+                                <p className="font-mono text-[11px] text-foreground/80">
+                                  {exp.litres != null ? `${exp.litres} L` : 'Fuel qty N/A'}
+                                  {exp.odometer_at_fill != null ? ` @ Odo ${exp.odometer_at_fill} km` : ''}
+                                </p>
+                              )}
+                              {exp.notes && (
+                                <p className="text-[11px] text-muted-foreground whitespace-pre-wrap">
+                                  <span className="font-medium text-foreground/80">Notes:</span> {exp.notes}
+                                </p>
+                              )}
+                              {(exp.receipt_path || receipts?.length) && (
+                                <div className="text-[11px] text-primary space-y-0.5">
+                                  <span className="font-medium text-foreground/80">Receipts:</span>{' '}
+                                  {receipts?.length ? (
+                                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                                      {receipts.map((r: any, idx: number) => {
+                                        const p = typeof r === 'string' ? r : r?.url || r?.path || r?.file_path;
+                                        const href = getFileUrl(p);
+                                        const label = typeof r === 'string' ? `Receipt ${idx + 1}` : r?.name || r?.original_name || `Receipt ${idx + 1}`;
+                                        const openPath = r?.id ? `/expenses/${exp.id}/attachments/${r.id}` : (p || `/expenses/${exp.id}/receipt`);
+                                        return href || r?.id ? (
+                                          <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => openProtectedFile(openPath).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                                            className="underline hover:text-primary/80"
+                                          >
+                                            {label}
+                                          </button>
+                                        ) : (
+                                          <span key={idx} className="text-muted-foreground">{label}</span>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : getFileUrl(exp.receipt_path) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openProtectedFile(`/expenses/${exp.id}/receipt`).catch((e) => toast.error(e?.message || 'Unable to open receipt'))}
+                                      className="underline hover:text-primary/80 ml-1"
+                                    >
+                                      Open receipt
+                                    </button>
+                                  ) : (
+                                    <span className="text-muted-foreground ml-1">attached</span>
+                                  )}
+                                </div>
+                              )}
+                              {exp.fuel_analysis?.is_anomaly && (
+                                <div className="flex items-start gap-1 text-[11px] font-semibold text-destructive">
+                                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                  <span>
+                                    Fuel anomaly: {exp.fuel_analysis.km_per_litre} km/L ({exp.fuel_analysis.deviation_pct}% dev)
+                                    {exp.fuel_analysis.reason ? `   ${exp.fuel_analysis.reason}` : ''}
+                                  </span>
+                                </div>
+                              )}
+                              {exp.rejection_reason && (
+                                <p className="text-[11px] text-destructive">
+                                  <span className="font-semibold">Rejection reason:</span> {exp.rejection_reason}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Mobile Actions Toolbar */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => setEditingExpense(exp)}
+                                title="Edit expense details"
+                              >
+                                <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                Edit
+                              </Button>
+                              {exp.status === 'pending' && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success-bg"
+                                    onClick={() => expenseStatusMutation.mutate({ expenseId: exp.id, status: 'approved' })}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive-bg"
+                                    onClick={() => {
+                                      const reason = window.prompt('Reason for rejecting this expense (required):', '');
+                                      if (reason && reason.trim()) {
+                                        expenseStatusMutation.mutate({ expenseId: exp.id, status: 'rejected', reason: reason.trim() });
+                                      } else if (reason !== null) {
+                                        toast.error('Rejection reason is required');
+                                      }
+                                    }}
+                                  >
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setExpenseToReassign(exp);
+                                  setReassignModalOpen(true);
+                                }}
+                                title="Reassign to another trip"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                Reassign
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden sm:block overflow-x-auto max-h-[420px] overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border sticky top-0 z-10 backdrop-blur">
                         <tr>
@@ -1066,14 +1222,14 @@ export default function TripDetailPage() {
       {/* Documents Tab */}
       {activeTab === 'documents' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-foreground">Trip Documents</p>
               <p className="text-xs text-muted-foreground">
                 Delivery notes and container interchange receipts for {trip.reference}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
@@ -1118,7 +1274,7 @@ export default function TripDetailPage() {
                 return (
                   <Card key={doc.id} className={cn('border', isVerified && 'border-success/40 bg-success-bg/10')}>
                     <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="space-y-1.5 flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
@@ -1217,7 +1373,7 @@ export default function TripDetailPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                           {canManage && !isVerified && (
                             <Button
                               size="sm"
@@ -1267,7 +1423,7 @@ export default function TripDetailPage() {
 
           {/* Add Document Dialog */}
           <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   Add {addDocType === 'container_interchange' ? 'Equipment Interchange Receipt (EIR)' : 'Delivery Note'}
@@ -1425,7 +1581,7 @@ export default function TripDetailPage() {
 
           {/* Verify Dialog */}
           <Dialog open={verifyDocId !== null} onOpenChange={() => setVerifyDocId(null)}>
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-sm max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Verify Document</DialogTitle>
                 <DialogDescription>
@@ -1454,7 +1610,7 @@ export default function TripDetailPage() {
               setUnlockReason('');
             }}
           >
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-sm max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Unlock Document</DialogTitle>
                 <DialogDescription>
@@ -1488,7 +1644,7 @@ export default function TripDetailPage() {
 
           {/* File Preview Dialog */}
           <Dialog open={previewFile !== null} onOpenChange={() => setPreviewFile(null)}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{previewFile?.original_name}</DialogTitle>
               </DialogHeader>
@@ -1522,7 +1678,7 @@ export default function TripDetailPage() {
 
       {/* Add Expense Sheet / Drawer */}
       <Sheet open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] sm:max-h-none overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Record Trip Expense</SheetTitle>
             <SheetDescription>
@@ -1641,7 +1797,7 @@ export default function TripDetailPage() {
 
       {/* Reassign Expense Modal (with audit reason requirement) */}
       <Dialog open={reassignModalOpen} onOpenChange={setReassignModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Reassign Expense to Another Trip</DialogTitle>
             <DialogDescription>
@@ -1715,7 +1871,7 @@ export default function TripDetailPage() {
 
       {/* Mark Delivered Modal */}
       <Dialog open={deliveredModalOpen} onOpenChange={setDeliveredModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Confirm Trip Delivery</DialogTitle>
             <DialogDescription>
@@ -1762,7 +1918,7 @@ export default function TripDetailPage() {
 
       {/* Settle Driver Advance Modal */}
       <Dialog open={settleModalOpen} onOpenChange={setSettleModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Settle Driver Advance</DialogTitle>
             <DialogDescription>

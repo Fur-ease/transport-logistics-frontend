@@ -594,7 +594,7 @@ export default function TripsPage() {
         )}
 
         {/* Status Filter Chips with live counts */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 text-xs">
           {statusOptions.map((st) => {
             const count = st.key === 'all' ? stats?.all : stats?.[st.key];
             return (
@@ -641,8 +641,107 @@ export default function TripsPage() {
           onAction={hasActiveFilters ? resetFilters : () => setSheetOpen(true)}
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm min-w-[1000px]">
+        <>
+          {/* Mobile Trips Cards View */}
+          <div className="block sm:hidden divide-y divide-border rounded-xl border border-border bg-card shadow-card overflow-hidden">
+            {trips.map((trip) => (
+              <div key={trip.id} className="p-4 space-y-3 hover:bg-muted/40 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Link href={`/trips/${trip.id}`} className="font-mono font-bold text-sm text-primary hover:underline">
+                      {trip.reference}
+                    </Link>
+                    {(trip.version ?? 1) > 1 && (
+                      <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                        v{trip.version}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={trip.status} />
+                    {renderRowActions(trip)}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-sm text-foreground">{trip.origin} → {trip.destination}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDate(trip.start_date)} {trip.end_date ? `to ${formatDate(trip.end_date)}` : '• Ongoing'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border/50">
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Truck / Trailer</span>
+                    <span className="font-mono font-bold text-foreground">{trip.truck?.reg_number}</span>
+                    {trip.trailer?.reg_number && (
+                      <span className="font-mono text-muted-foreground block text-[11px]">
+                        Trailer {trip.trailer.reg_number}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Driver</span>
+                    <span className="font-medium text-foreground">{trip.driver?.name || '—'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground block text-[11px]">Customer & Cargo</span>
+                    <span className="font-medium text-foreground">{trip.customer?.name}</span>
+                    {trip.cargo_description && (
+                      <span className="text-muted-foreground block truncate">{trip.cargo_description}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Documents tags */}
+                {trip.documents && trip.documents.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {trip.documents.map((d) => (
+                      <span
+                        key={d.id}
+                        className="inline-flex items-center gap-1 font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground text-[10px]"
+                      >
+                        {d.type === 'delivery_note' ? 'DN' : 'EIR'}: {d.document_number}
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            d.status === 'verified'
+                              ? 'bg-success'
+                              : d.status === 'received'
+                                ? 'bg-primary'
+                                : 'bg-warning'
+                          }`}
+                        />
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Financial 2x2 Mini Grid */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50 text-xs">
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Net Revenue</span>
+                    <MoneyText amount={trip.net_revenue ?? (trip.agreed_rate - (trip.credit_note_amount ?? 0))} size="sm" />
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Direct Costs</span>
+                    <MoneyText amount={trip.approved_expenses_total} variant="negative" size="sm" />
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Agreed Rate</span>
+                    <MoneyText amount={trip.agreed_rate} size="sm" />
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Contribution</span>
+                    <MoneyText amount={trip.contribution} variant={trip.contribution < 0 ? 'negative' : 'positive'} size="sm" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto rounded-xl border border-border bg-card shadow-card">
+            <table className="w-full text-sm min-w-[1000px]">
             <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
               <tr>
                 <th className="py-3 px-4 text-left font-medium">Trip Ref</th>
@@ -731,6 +830,7 @@ export default function TripsPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* Pagination */}
@@ -782,7 +882,7 @@ export default function TripsPage() {
 
       {/* Create Trip Sheet / Drawer */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="sm:max-w-lg">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-lg max-h-[92vh] sm:max-h-none overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Create New Trip</SheetTitle>
             <SheetDescription>

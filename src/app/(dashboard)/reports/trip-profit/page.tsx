@@ -302,7 +302,7 @@ export default function TripProfitSheetPage() {
       {/* Filter Bar */}
       <Card className="border-border">
         <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-border/60">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-border/60 gap-2">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
               <span>Report Filters &amp; Dimensions</span>
@@ -539,7 +539,43 @@ export default function TripProfitSheetPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            {/* Mobile Per-Truck Cards View */}
+            <div className="block sm:hidden divide-y divide-border">
+              {truckSummaries.map((ts) => (
+                <div key={ts.truck_id} className="p-4 space-y-2 hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <Link href={`/trucks/${ts.truck_id}`} className="font-mono font-bold text-primary hover:underline text-sm">
+                      {ts.truck_reg}
+                    </Link>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-secondary">
+                      {ts.trips_made} {ts.trips_made === 1 ? 'trip' : 'trips'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Distance</span>
+                      <span className="font-mono text-foreground">{formatKm(ts.total_km)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Net Revenue</span>
+                      <span className="font-mono font-medium text-foreground">{formatKES(ts.revenue)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Direct Costs</span>
+                      <span className="font-mono text-destructive">{formatKES(ts.direct_costs)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Contribution</span>
+                      <span className={`font-mono font-bold text-sm ${ts.contribution < 0 ? 'text-destructive' : 'text-success'}`}>
+                        {formatKES(ts.contribution)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop Table View */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-xs min-w-[850px]">
                 <thead className="bg-secondary/60 text-muted-foreground uppercase border-y border-border">
                   <tr>
@@ -602,7 +638,76 @@ export default function TripProfitSheetPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Mobile Trip Profit Cards View */}
+          <div className="block sm:hidden divide-y divide-border">
+            {isLoading ? (
+              <div className="p-6 text-center text-xs text-muted-foreground">Loading trip profits...</div>
+            ) : sortedTrips.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                No delivery trips matched the selected filters.
+              </div>
+            ) : (
+              sortedTrips.map((row) => (
+                <div
+                  key={row.id}
+                  className={`p-4 space-y-2.5 hover:bg-muted/40 transition-colors ${
+                    row.is_negative ? 'bg-destructive/5' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Link href={`/trips/${row.id}`} className="font-mono font-bold text-primary hover:underline text-sm">
+                        {row.reference}
+                      </Link>
+                      {row.is_negative && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-destructive-bg text-destructive border border-destructive/30">
+                          Loss
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-secondary">
+                      {row.margin_pct !== null ? `${row.margin_pct.toFixed(1)}% margin` : '—'}
+                    </span>
+                  </div>
+
+                  <div className="text-xs">
+                    <p className="font-semibold text-foreground">{row.customer_name} • {row.route}</p>
+                    <p className="text-muted-foreground font-mono text-[11px] mt-0.5">
+                      {row.truck_reg} • {row.driver_name} {row.date ? `• Delivered ${formatDate(row.date)}` : ''}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Net Revenue</span>
+                      <span className="font-mono font-medium text-foreground">{formatKES(row.revenue)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Total Costs</span>
+                      <span className="font-mono text-destructive">{formatKES(row.total_direct_costs)}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground block text-[11px]">Contribution</span>
+                      <span className={`font-mono font-bold text-sm ${row.contribution < 0 ? 'text-destructive' : 'text-success'}`}>
+                        {formatKES(row.contribution)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cost breakdown breakdown line */}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground pt-1 border-t border-border/40 font-mono">
+                    <span>Fuel: {formatKES(row.fuel)}</span>
+                    <span>Allowances: {formatKES(row.allowance)}</span>
+                    <span>Tolls/Cess: {formatKES(row.tolls_levies)}</span>
+                    <span>Other: {formatKES(row.other_direct)}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-xs min-w-[1100px]">
               <thead className="bg-secondary/70 text-muted-foreground uppercase border-y border-border">
                 <tr>

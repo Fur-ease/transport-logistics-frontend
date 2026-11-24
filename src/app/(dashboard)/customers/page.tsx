@@ -137,14 +137,14 @@ export default function CustomersPage() {
         <select
           value={hasBalance}
           onChange={(e) => { setHasBalance(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border border-input bg-card px-2 text-xs text-foreground"
+          className="h-9 rounded-md border border-input bg-card px-2 text-xs text-foreground w-full sm:w-auto"
         >
           <option value="">All balances</option>
           <option value="yes">Has balance</option>
           <option value="no">No balance</option>
         </select>
         {(search || hasBalance) && (
-          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setHasBalance(''); setPage(1); }} className="w-fit">Clear</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setHasBalance(''); setPage(1); }} className="w-full sm:w-fit">Clear</Button>
         )}
       </div>
 
@@ -164,8 +164,82 @@ export default function CustomersPage() {
           onAction={() => setSheetOpen(true)}
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm min-w-[750px]">
+        <>
+          {/* Mobile Customer Cards View */}
+          <div className="block sm:hidden divide-y divide-border rounded-xl border border-border bg-card shadow-card overflow-hidden">
+            {customers.map((cust) => (
+              <div key={cust.id} className="p-4 space-y-3 hover:bg-muted/40 transition-colors">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-foreground text-sm">{cust.name}</p>
+                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                      {cust.phone && (
+                        <a href={`tel:${cust.phone}`} className="hover:underline text-primary">
+                          {cust.phone}
+                        </a>
+                      )}
+                      {cust.email && (
+                        <a href={`mailto:${cust.email}`} className="hover:underline">
+                          {cust.email}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full bg-secondary border border-border text-[11px] font-medium">
+                    {cust.payment_terms_days}d terms
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border/50">
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Total Billed</span>
+                    <span className="font-mono font-semibold text-foreground">{formatKES(cust.total_invoiced)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px]">Balance Owed</span>
+                    <MoneyText
+                      amount={cust.balance_owed}
+                      variant={cust.balance_owed && cust.balance_owed > 0 ? 'negative' : 'muted'}
+                      size="base"
+                    />
+                  </div>
+                </div>
+
+                {/* Ageing Breakdown */}
+                <div className="p-2.5 rounded-lg bg-secondary/50 border border-border/60 text-xs space-y-1">
+                  <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider block">
+                    Receivables Ageing
+                  </span>
+                  <div className="grid grid-cols-4 gap-1 text-center font-mono text-[11px]">
+                    <div className="p-1 rounded bg-background/50">
+                      <span className="text-[10px] text-muted-foreground block">Current</span>
+                      <span className="text-foreground">{cust.aging?.current ? formatKES(cust.aging.current) : '—'}</span>
+                    </div>
+                    <div className="p-1 rounded bg-background/50">
+                      <span className="text-[10px] text-muted-foreground block">1–30d</span>
+                      <span className="text-foreground">{cust.aging?.days_1_30 ? formatKES(cust.aging.days_1_30) : '—'}</span>
+                    </div>
+                    <div className="p-1 rounded bg-background/50">
+                      <span className="text-[10px] text-warning block font-semibold">31–60d</span>
+                      <span className="text-warning font-medium">{cust.aging?.days_31_60 ? formatKES(cust.aging.days_31_60) : '—'}</span>
+                    </div>
+                    <div className="p-1 rounded bg-background/50">
+                      <span className="text-[10px] text-destructive block font-semibold">61–90d+</span>
+                      <span className="text-destructive font-bold">
+                        {cust.aging?.days_61_90 || cust.aging?.days_90_plus
+                          ? formatKES((cust.aging?.days_61_90 || 0) + (cust.aging?.days_90_plus || 0))
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden sm:block overflow-x-auto rounded-xl border border-border bg-card shadow-card">
+            <table className="w-full text-sm min-w-[750px]">
             <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
               <tr>
                 <th className="py-3 px-4 text-left font-medium">Customer</th>
@@ -219,19 +293,20 @@ export default function CustomersPage() {
               ))}
             </tbody>
           </table>
-          <div className="flex items-center justify-between p-3 border-t border-border text-xs">
-            <span className="text-muted-foreground">Page {meta?.current_page ?? page} of {meta?.last_page ?? 1} • {meta?.total ?? customers.length} customers</span>
+          <div className="flex flex-col sm:flex-row items-center justify-between p-3 border-t border-border text-xs gap-2">
+            <span className="text-muted-foreground text-center sm:text-left">Page {meta?.current_page ?? page} of {meta?.last_page ?? 1} • {meta?.total ?? customers.length} customers</span>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" disabled={(meta?.current_page ?? page) <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
               <Button size="sm" variant="outline" disabled={(meta?.current_page ?? page) >= (meta?.last_page ?? 1)} onClick={() => setPage((p) => p + 1)}>Next</Button>
             </div>
           </div>
         </div>
+        </>
       )}
 
       {/* Add Customer Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] sm:max-h-none overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Add Customer Account</SheetTitle>
             <SheetDescription>

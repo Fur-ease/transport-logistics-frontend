@@ -76,7 +76,7 @@ export default function ReportsPage() {
         title="Fleet & Operational Reports"
         description="Real-time analytics for trips, contribution, fuel audit and receivables ageing. Period applies to date-based reports."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => exportCsv('trips_per_truck')}><Download className="mr-1.5 h-4 w-4" />Trips/Truck CSV</Button>
             <Button variant="outline" size="sm" onClick={() => exportCsv('trips')}><Download className="mr-1.5 h-4 w-4" />Trips CSV</Button>
           </div>
@@ -113,7 +113,7 @@ export default function ReportsPage() {
         </TabsList>
 
         <TabsContent value="trips_per_truck" className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Agreed</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_agreed_revenue ?? tpt?.summary?.total_revenue ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Credit Notes</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_credit_notes ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Net Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_revenue ?? 0)}</p></Card>
@@ -121,39 +121,165 @@ export default function ReportsPage() {
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Contribution</span><p className="text-xl font-mono font-bold text-success mt-1">{formatKES(tpt?.summary?.total_contribution ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Trips</span><p className="text-xl font-bold text-primary mt-1">{tpt?.summary?.total_trips_made ?? 0}</p></Card>
           </div>
-          <Card><CardHeader className="pb-2"><CardTitle>Trips Completed per Truck</CardTitle><CardDescription>Contribution from net revenue (agreed minus applied credit notes) minus approved direct expenses</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[700px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
-              <th className="py-3 px-4 text-left">Reg</th><th className="py-3 px-4 text-center font-bold text-primary">Trips</th><th className="py-3 px-4 text-right">Agreed</th><th className="py-3 px-4 text-right">CN</th><th className="py-3 px-4 text-right">Net Rev</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-center">Util %</th>
-            </tr></thead><tbody className="divide-y divide-border">
-              {tptLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={8} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
-              paged.rows.map((truck:any)=>(
-                <tr key={truck.truck_id} className="hover:bg-muted/40"><td className="py-3.5 px-4 font-mono font-bold text-primary"><Link href={`/trucks/${truck.truck_id}`} className="hover:underline">{truck.reg_number}</Link></td>
-                  <td className="py-3.5 px-4 text-center"><span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{truck.trips_made}</span></td>
-                  <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.agreed_revenue ?? truck.revenue)}</td>
-                  <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.credit_note_amount ?? 0)}</td>
-                  <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.revenue)}</td>
-                  <td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">{formatKES(truck.expenses)}</td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-success">{formatKES(truck.contribution)}</td>
-                  <td className="py-3.5 px-4 text-center text-xs font-semibold">{truck.utilisation_pct}%</td></tr>
-              ))}
-            </tbody></table></div></CardContent></Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Trips Completed per Truck</CardTitle>
+              <CardDescription>Contribution from net revenue (agreed minus applied credit notes) minus approved direct expenses</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Mobile Cards View */}
+              <div className="block sm:hidden divide-y divide-border">
+                {tptLoading ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">Loading report...</div>
+                ) : (
+                  paged.rows.map((truck: any) => (
+                    <div key={truck.truck_id} className="p-4 space-y-2 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <Link href={`/trucks/${truck.truck_id}`} className="font-mono font-bold text-primary hover:underline text-sm">
+                          {truck.reg_number}
+                        </Link>
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                          {truck.trips_made} {truck.trips_made === 1 ? 'trip' : 'trips'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Net Revenue</span>
+                          <span className="font-mono font-medium text-foreground">{formatKES(truck.revenue)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Direct Costs</span>
+                          <span className="font-mono text-destructive">{formatKES(truck.expenses)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Contribution</span>
+                          <span className="font-mono font-bold text-sm text-success">{formatKES(truck.contribution)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Utilisation</span>
+                          <span className="font-semibold text-foreground">{truck.utilisation_pct}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[700px]">
+                  <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Reg</th>
+                      <th className="py-3 px-4 text-center font-bold text-primary">Trips</th>
+                      <th className="py-3 px-4 text-right">Agreed</th>
+                      <th className="py-3 px-4 text-right">CN</th>
+                      <th className="py-3 px-4 text-right">Net Rev</th>
+                      <th className="py-3 px-4 text-right">Direct Costs</th>
+                      <th className="py-3 px-4 text-right font-semibold text-success">Contribution</th>
+                      <th className="py-3 px-4 text-center">Util %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {tptLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={8} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
+                    paged.rows.map((truck:any)=>(
+                      <tr key={truck.truck_id} className="hover:bg-muted/40">
+                        <td className="py-3.5 px-4 font-mono font-bold text-primary"><Link href={`/trucks/${truck.truck_id}`} className="hover:underline">{truck.reg_number}</Link></td>
+                        <td className="py-3.5 px-4 text-center"><span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">{truck.trips_made}</span></td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.agreed_revenue ?? truck.revenue)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.credit_note_amount ?? 0)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(truck.revenue)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">{formatKES(truck.expenses)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-success">{formatKES(truck.contribution)}</td>
+                        <td className="py-3.5 px-4 text-center text-xs font-semibold">{truck.utilisation_pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="profitability" className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Agreed</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_agreed_revenue ?? profData?.summary?.total_revenue ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Credit Notes</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_credit_notes ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Net Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_revenue ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Direct Costs</span><p className="text-xl font-mono font-bold text-destructive mt-1">{formatKES(profData?.summary?.total_direct_costs ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Contribution</span><p className="text-xl font-mono font-bold text-success mt-1">{formatKES(profData?.summary?.total_contribution ?? 0)}</p></Card>
           </div>
-          <Card><CardHeader className="pb-2"><CardTitle>Trip Contribution Breakdown</CardTitle><CardDescription>{profData?.summary?.note || 'Net revenue minus approved direct trip expenses.'}</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[650px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
-              <th className="py-3 px-4 text-left">Trip</th><th className="py-3 px-4 text-right">Agreed</th><th className="py-3 px-4 text-right">CN</th><th className="py-3 px-4 text-right">Net Rev</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-right">Margin</th>
-            </tr></thead><tbody className="divide-y divide-border">
-              {profLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
-              paged.rows.map((t:any)=>(<tr key={t.trip_id} className="hover:bg-muted/40"><td className="py-3.5 px-4 font-mono font-bold text-primary"><Link href={`/trips/${t.trip_id}`} className="hover:underline inline-flex items-center gap-1">{t.reference}<ArrowUpRight className="h-3 w-3"/></Link></td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.agreed_revenue ?? t.revenue)}</td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.credit_note_amount ?? 0)}</td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.revenue)}</td><td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">{formatKES(t.approved_direct_costs)}</td><td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-success">{formatKES(t.contribution)}</td><td className="py-3.5 px-4 text-right font-mono text-xs font-semibold">{t.contribution_margin_pct}%</td></tr>))}
-            </tbody></table></div></CardContent></Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Trip Contribution Breakdown</CardTitle>
+              <CardDescription>{profData?.summary?.note || 'Net revenue minus approved direct trip expenses.'}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Mobile Cards View */}
+              <div className="block sm:hidden divide-y divide-border">
+                {profLoading ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">Loading report...</div>
+                ) : (
+                  paged.rows.map((t: any) => (
+                    <div key={t.trip_id} className="p-4 space-y-2 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <Link href={`/trips/${t.trip_id}`} className="font-mono font-bold text-primary hover:underline text-sm inline-flex items-center gap-1">
+                          {t.reference}
+                          <ArrowUpRight className="h-3 w-3" />
+                        </Link>
+                        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-secondary">
+                          {t.contribution_margin_pct}% margin
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Net Revenue</span>
+                          <span className="font-mono font-medium text-foreground">{formatKES(t.revenue)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Direct Costs</span>
+                          <span className="font-mono text-destructive">{formatKES(t.approved_direct_costs)}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground block text-[11px]">Contribution</span>
+                          <span className="font-mono font-bold text-sm text-success">{formatKES(t.contribution)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[650px]">
+                  <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Trip</th>
+                      <th className="py-3 px-4 text-right">Agreed</th>
+                      <th className="py-3 px-4 text-right">CN</th>
+                      <th className="py-3 px-4 text-right">Net Rev</th>
+                      <th className="py-3 px-4 text-right">Direct Costs</th>
+                      <th className="py-3 px-4 text-right font-semibold text-success">Contribution</th>
+                      <th className="py-3 px-4 text-right">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {profLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
+                    paged.rows.map((t:any)=>(
+                      <tr key={t.trip_id} className="hover:bg-muted/40">
+                        <td className="py-3.5 px-4 font-mono font-bold text-primary"><Link href={`/trips/${t.trip_id}`} className="hover:underline inline-flex items-center gap-1">{t.reference}<ArrowUpRight className="h-3 w-3"/></Link></td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.agreed_revenue ?? t.revenue)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.credit_note_amount ?? 0)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(t.revenue)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs text-destructive">{formatKES(t.approved_direct_costs)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-success">{formatKES(t.contribution)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs font-semibold">{t.contribution_margin_pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="fuel_efficiency" className="space-y-4 mt-4">
@@ -162,13 +288,89 @@ export default function ReportsPage() {
             <Card className="p-4 border-destructive/30"><span className="text-xs font-medium uppercase text-destructive">Anomalies</span><p className="text-2xl font-bold text-destructive mt-1">{fuelData?.summary?.anomalies_detected ?? 0}</p></Card>
             <Card className="p-4"><span className="text-xs font-medium uppercase text-muted-foreground">Total Fuel Cost</span><p className="text-2xl font-bold text-primary mt-1">{formatKES(fuelData?.summary?.total_fuel_cost ?? 0)}</p></Card>
           </div>
-          <Card><CardHeader className="pb-2"><CardTitle>Refill Log & Anomaly Trail</CardTitle><CardDescription>Fuel entries with odometer/litre checks vs rolling average</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[650px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
-              <th className="py-3 px-4 text-left">Date</th><th className="py-3 px-4 text-left">Truck</th><th className="py-3 px-4 text-left">Trip</th><th className="py-3 px-4 text-right">Litres</th><th className="py-3 px-4 text-right">Cost</th><th className="py-3 px-4 text-center">Km/L</th><th className="py-3 px-4 text-center">Audit</th>
-            </tr></thead><tbody className="divide-y divide-border">
-              {fuelLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
-              paged.rows.map((f:any)=>(<tr key={f.expense_id} className={`hover:bg-muted/40 ${f.analysis?.is_anomaly?'bg-destructive-bg/30':''}`}><td className="py-3.5 px-4 text-xs text-muted-foreground">{formatDate(f.date)}</td><td className="py-3.5 px-4 font-mono font-bold">{f.truck}</td><td className="py-3.5 px-4 font-mono text-xs text-primary">{f.trip_reference}</td><td className="py-3.5 px-4 text-right font-mono text-xs">{f.litres} L</td><td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(f.amount)}</td><td className="py-3.5 px-4 text-center font-mono font-bold text-sm">{f.analysis?.km_per_litre?`${f.analysis.km_per_litre} km/L`:'—'}</td><td className="py-3.5 px-4 text-center">{f.analysis?.is_anomaly ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-destructive-bg text-destructive border border-destructive/30"><AlertTriangle className="h-3 w-3"/>{f.analysis.deviation_pct}%</span> : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success-bg text-success border border-success/30">Normal</span>}</td></tr>))}
-            </tbody></table></div></CardContent></Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Refill Log & Anomaly Trail</CardTitle>
+              <CardDescription>Fuel entries with odometer/litre checks vs rolling average</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Mobile Cards View */}
+              <div className="block sm:hidden divide-y divide-border">
+                {fuelLoading ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">Loading report...</div>
+                ) : (
+                  paged.rows.map((f: any) => (
+                    <div key={f.expense_id} className={`p-4 space-y-2 hover:bg-muted/40 transition-colors ${f.analysis?.is_anomaly ? 'bg-destructive-bg/30' : ''}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="font-mono font-bold text-foreground text-sm">{f.truck}</span>
+                          <span className="text-xs text-muted-foreground block">{formatDate(f.date)}</span>
+                        </div>
+                        {f.analysis?.is_anomaly ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-destructive-bg text-destructive border border-destructive/30">
+                            <AlertTriangle className="h-3 w-3" />
+                            {f.analysis.deviation_pct}% anomaly
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success-bg text-success border border-success/30">
+                            Normal
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-border/50">
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Trip</span>
+                          <span className="font-mono text-primary font-medium">{f.trip_reference || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Litres</span>
+                          <span className="font-mono font-medium text-foreground">{f.litres} L</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Efficiency</span>
+                          <span className="font-mono font-bold text-foreground">{f.analysis?.km_per_litre ? `${f.analysis.km_per_litre} km/L` : '—'}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-1 border-t border-border/40 text-xs">
+                        <span className="text-muted-foreground">Total Cost:</span>
+                        <span className="font-mono font-bold text-foreground">{formatKES(f.amount)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[650px]">
+                  <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Date</th>
+                      <th className="py-3 px-4 text-left">Truck</th>
+                      <th className="py-3 px-4 text-left">Trip</th>
+                      <th className="py-3 px-4 text-right">Litres</th>
+                      <th className="py-3 px-4 text-right">Cost</th>
+                      <th className="py-3 px-4 text-center">Km/L</th>
+                      <th className="py-3 px-4 text-center">Audit</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {fuelLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
+                    paged.rows.map((f:any)=>(
+                      <tr key={f.expense_id} className={`hover:bg-muted/40 ${f.analysis?.is_anomaly?'bg-destructive-bg/30':''}`}>
+                        <td className="py-3.5 px-4 text-xs text-muted-foreground">{formatDate(f.date)}</td>
+                        <td className="py-3.5 px-4 font-mono font-bold">{f.truck}</td>
+                        <td className="py-3.5 px-4 font-mono text-xs text-primary">{f.trip_reference}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{f.litres} L</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatKES(f.amount)}</td>
+                        <td className="py-3.5 px-4 text-center font-mono font-bold text-sm">{f.analysis?.km_per_litre?`${f.analysis.km_per_litre} km/L`:'—'}</td>
+                        <td className="py-3.5 px-4 text-center">{f.analysis?.is_anomaly ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-destructive-bg text-destructive border border-destructive/30"><AlertTriangle className="h-3 w-3"/>{f.analysis.deviation_pct}%</span> : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success-bg text-success border border-success/30">Normal</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="customer_aging" className="space-y-4 mt-4">
@@ -177,13 +379,83 @@ export default function ReportsPage() {
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Customers Owing</span><p className="text-xl font-bold mt-1">{agingData?.customers?.length ?? 0}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">As of</span><p className="text-sm font-semibold mt-2">{agingData?.as_of_date ? formatDate(agingData.as_of_date) : '—'}</p></Card>
           </div>
-          <Card><CardHeader className="pb-2"><CardTitle>Customer Receivables Ageing</CardTitle><CardDescription>Outstanding balances by ageing bucket (real-time invoice/payment/credit state)</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[650px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
-              <th className="py-3 px-4 text-left">Customer</th><th className="py-3 px-4 text-right font-bold text-destructive">Total Owed</th><th className="py-3 px-4 text-right">Current</th><th className="py-3 px-4 text-right">1–30</th><th className="py-3 px-4 text-right">31–60</th><th className="py-3 px-4 text-right text-destructive">61–90+</th>
-            </tr></thead><tbody className="divide-y divide-border">
-              {agingLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={6} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
-              paged.rows.map((c:any)=>(<tr key={c.id} className="hover:bg-muted/40"><td className="py-3.5 px-4 font-semibold">{c.name}<span className="block text-[11px] text-muted-foreground font-normal">{c.phone||''}</span></td><td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-destructive">{formatKES(c.total_balance_owed)}</td><td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">{c.current?formatKES(c.current):'—'}</td><td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">{c.days_1_30?formatKES(c.days_1_30):'—'}</td><td className="py-3.5 px-4 text-right font-mono text-xs text-warning font-medium">{c.days_31_60?formatKES(c.days_31_60):'—'}</td><td className="py-3.5 px-4 text-right font-mono text-xs text-destructive font-bold">{(c.days_61_90||c.days_90_plus)?formatKES((c.days_61_90||0)+(c.days_90_plus||0)):'—'}</td></tr>))}
-            </tbody></table></div></CardContent></Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Customer Receivables Ageing</CardTitle>
+              <CardDescription>Outstanding balances by ageing bucket (real-time invoice/payment/credit state)</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {/* Mobile Cards View */}
+              <div className="block sm:hidden divide-y divide-border">
+                {agingLoading ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">Loading report...</div>
+                ) : (
+                  paged.rows.map((c: any) => (
+                    <div key={c.id} className="p-4 space-y-2 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-foreground text-sm">{c.name}</p>
+                          {c.phone && <p className="text-xs text-muted-foreground">{c.phone}</p>}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Total Owed</span>
+                          <span className="font-mono font-bold text-sm text-destructive">{formatKES(c.total_balance_owed)}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1 text-center font-mono text-[11px] pt-1 border-t border-border/50">
+                        <div className="p-1 rounded bg-secondary/40">
+                          <span className="text-[10px] text-muted-foreground block">Current</span>
+                          <span className="text-foreground">{c.current ? formatKES(c.current) : '—'}</span>
+                        </div>
+                        <div className="p-1 rounded bg-secondary/40">
+                          <span className="text-[10px] text-muted-foreground block">1–30d</span>
+                          <span className="text-foreground">{c.days_1_30 ? formatKES(c.days_1_30) : '—'}</span>
+                        </div>
+                        <div className="p-1 rounded bg-secondary/40">
+                          <span className="text-[10px] text-warning block font-semibold">31–60d</span>
+                          <span className="text-warning font-medium">{c.days_31_60 ? formatKES(c.days_31_60) : '—'}</span>
+                        </div>
+                        <div className="p-1 rounded bg-secondary/40">
+                          <span className="text-[10px] text-destructive block font-semibold">61–90+</span>
+                          <span className="text-destructive font-bold">
+                            {(c.days_61_90 || c.days_90_plus) ? formatKES((c.days_61_90 || 0) + (c.days_90_plus || 0)) : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[650px]">
+                  <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Customer</th>
+                      <th className="py-3 px-4 text-right font-bold text-destructive">Total Owed</th>
+                      <th className="py-3 px-4 text-right">Current</th>
+                      <th className="py-3 px-4 text-right">1–30</th>
+                      <th className="py-3 px-4 text-right">31–60</th>
+                      <th className="py-3 px-4 text-right text-destructive">61–90+</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {agingLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={6} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
+                    paged.rows.map((c:any)=>(
+                      <tr key={c.id} className="hover:bg-muted/40">
+                        <td className="py-3.5 px-4 font-semibold">{c.name}<span className="block text-[11px] text-muted-foreground font-normal">{c.phone||''}</span></td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-destructive">{formatKES(c.total_balance_owed)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">{c.current?formatKES(c.current):'—'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs text-muted-foreground">{c.days_1_30?formatKES(c.days_1_30):'—'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs text-warning font-medium">{c.days_31_60?formatKES(c.days_31_60):'—'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs text-destructive font-bold">{(c.days_61_90||c.days_90_plus)?formatKES((c.days_61_90||0)+(c.days_90_plus||0)):'—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

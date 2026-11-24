@@ -192,7 +192,7 @@ export function EditTripSheet({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-6">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-xl max-h-[92vh] sm:max-h-none overflow-y-auto p-4 sm:p-6">
           <SheetHeader className="pb-4 border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
