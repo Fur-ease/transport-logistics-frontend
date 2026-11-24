@@ -349,13 +349,13 @@ export default function TruckDetailPage() {
 
       {/* 6 Tabs: Overview, Trips, Fuel, Maintenance, Documents, History */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="flex items-center justify-start overflow-x-auto w-full p-1 h-auto text-xs">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="trips">Trips ({truck.trips_count ?? 0})</TabsTrigger>
-          <TabsTrigger value="fuel">Fuel Logs</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance ({truck.maintenance_records?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="documents">Compliance ({truck.compliance_documents?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+        <TabsList className="flex items-center justify-start overflow-x-auto no-scrollbar w-full p-1 h-auto text-xs gap-1">
+          <TabsTrigger value="overview" className="shrink-0 whitespace-nowrap">Overview</TabsTrigger>
+          <TabsTrigger value="trips" className="shrink-0 whitespace-nowrap">Trips ({truck.trips_count ?? 0})</TabsTrigger>
+          <TabsTrigger value="fuel" className="shrink-0 whitespace-nowrap">Fuel Logs</TabsTrigger>
+          <TabsTrigger value="maintenance" className="shrink-0 whitespace-nowrap">Maintenance ({truck.maintenance_records?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="documents" className="shrink-0 whitespace-nowrap">Compliance ({truck.compliance_documents?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="history" className="shrink-0 whitespace-nowrap">History</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview with Trips-over-time Chart */}
@@ -557,7 +557,7 @@ export default function TruckDetailPage() {
             <CardContent className="p-0">
               <div className="p-3 space-y-3 border-b border-border">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
-                  <div className="relative flex-1 max-w-sm">
+                  <div className="relative w-full lg:max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search ref, route, driver, customer, trailer..."
@@ -571,20 +571,20 @@ export default function TruckDetailPage() {
                       type="date"
                       value={tripFrom}
                       onChange={(e) => setTripFrom(e.target.value)}
-                      className="h-9 text-xs w-36"
+                      className="h-9 text-xs w-full sm:w-36 flex-1 sm:flex-none"
                       title="Start date from"
                     />
                     <Input
                       type="date"
                       value={tripTo}
                       onChange={(e) => setTripTo(e.target.value)}
-                      className="h-9 text-xs w-36"
+                      className="h-9 text-xs w-full sm:w-36 flex-1 sm:flex-none"
                       title="Start date to"
                     />
                     <select
                       value={tripSort}
                       onChange={(e) => setTripSort(e.target.value)}
-                      className="h-9 px-2.5 rounded-lg border border-input bg-card text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="h-9 px-2.5 rounded-lg border border-input bg-card text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-1 sm:flex-none"
                     >
                       <option value="start_date">Start date</option>
                       <option value="end_date">End date</option>
@@ -595,7 +595,7 @@ export default function TruckDetailPage() {
                     <select
                       value={tripDirection}
                       onChange={(e) => setTripDirection(e.target.value as 'asc' | 'desc')}
-                      className="h-9 px-2.5 rounded-lg border border-input bg-card text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="h-9 px-2.5 rounded-lg border border-input bg-card text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex-1 sm:flex-none"
                     >
                       <option value="desc">Newest first</option>
                       <option value="asc">Oldest first</option>
@@ -618,14 +618,14 @@ export default function TruckDetailPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
                   {tripStatusChips.map((st) => {
                     const count = tripStats?.[st.key as keyof NonNullable<typeof tripStats>];
                     return (
                       <button
                         key={st.key}
                         onClick={() => setTripStatus(st.key)}
-                        className={`px-3 py-1.5 rounded-full font-medium capitalize transition-colors border cursor-pointer whitespace-nowrap ${
+                        className={`px-3 py-1.5 rounded-full font-medium capitalize transition-colors border cursor-pointer whitespace-nowrap shrink-0 ${
                           tripStatus === st.key
                             ? 'bg-primary text-white border-primary font-semibold shadow-sm'
                             : 'bg-card text-muted-foreground border-border hover:text-foreground'
@@ -646,8 +646,64 @@ export default function TruckDetailPage() {
                   })}
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              {/* Mobile Trips Cards */}
+              <div className="block sm:hidden divide-y divide-border">
+                {isTripsLoading ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    Loading trips...
+                  </div>
+                ) : truckTrips.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    No trips match the current filters for this vehicle.
+                  </div>
+                ) : (
+                  truckTrips.map((trip) => (
+                    <div key={trip.id} className="p-4 space-y-2.5 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <Link
+                          href={`/trips/${trip.id}`}
+                          className="font-mono text-sm font-bold text-primary hover:underline"
+                        >
+                          {trip.reference}
+                        </Link>
+                        <StatusBadge status={trip.status} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-foreground">
+                          {trip.origin} → {trip.destination}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(trip.start_date)}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
+                        <div>
+                          <span className="text-muted-foreground">Driver: </span>
+                          <span className="text-foreground font-medium">{trip.driver?.name || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Trailer: </span>
+                          <span className="font-mono text-foreground font-medium">{trip.trailer?.reg_number || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Customer: </span>
+                          <span className="text-foreground font-medium">{trip.customer?.name || '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Distance: </span>
+                          <span className="font-mono text-foreground">{formatKm(trip.total_distance_km)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs text-muted-foreground">Agreed Rate:</span>
+                        <MoneyText amount={trip.agreed_rate} size="base" />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[700px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">Trip Ref</th>
@@ -755,8 +811,49 @@ export default function TruckDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              {/* Mobile Maintenance Cards */}
+              <div className="block sm:hidden divide-y divide-border">
+                {truck.maintenance_records?.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    No workshop maintenance logged for this vehicle.
+                  </div>
+                ) : (
+                  truck.maintenance_records?.map((record) => (
+                    <div key={record.id} className="p-4 space-y-2 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-sm text-foreground">{record.type}</span>
+                        <MoneyText amount={record.cost} variant="negative" size="base" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Date: </span>
+                          <span className="text-foreground">{formatDate(record.date)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Odometer: </span>
+                          <span className="font-mono text-foreground">{formatKm(record.odometer)}</span>
+                        </div>
+                      </div>
+                      {(record.next_due_date || record.next_due_km) && (
+                        <div className="text-xs text-muted-foreground">
+                          <span>Next Due: </span>
+                          <span className="text-foreground font-medium">
+                            {record.next_due_date ? formatDate(record.next_due_date) : ''}
+                            {record.next_due_km ? ` • ${formatKm(record.next_due_km)}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      {record.notes && (
+                        <p className="text-xs text-muted-foreground italic border-t border-border/50 pt-1">
+                          {record.notes}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">Date</th>
@@ -814,8 +911,62 @@ export default function TruckDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              {/* Mobile Documents Cards */}
+              <div className="block sm:hidden divide-y divide-border">
+                {truck.compliance_documents?.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    No compliance documents on file for this vehicle.
+                  </div>
+                ) : (
+                  truck.compliance_documents?.map((doc) => {
+                    const isExpired = doc.days_until_expiry < 0;
+                    const isExpiringSoon = doc.days_until_expiry >= 0 && doc.days_until_expiry <= 30;
+
+                    return (
+                      <div key={doc.id} className="p-4 space-y-2 hover:bg-muted/40 transition-colors">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-sm capitalize text-foreground">
+                            {doc.type.replace('_', ' ')}
+                          </span>
+                          {isExpired ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-destructive">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Expired {Math.abs(doc.days_until_expiry)}d ago
+                            </span>
+                          ) : isExpiringSoon ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
+                              <Clock className="h-3.5 w-3.5" />
+                              Expires in {doc.days_until_expiry}d
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+                              <FileCheck className="h-3.5 w-3.5" />
+                              Valid ({doc.days_until_expiry}d)
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">Cert #: </span>
+                            <span className="font-mono text-foreground">{doc.document_number || '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Expires: </span>
+                            <span className="text-foreground">{formatDate(doc.expiry_date)}</span>
+                          </div>
+                        </div>
+                        {doc.notes && (
+                          <p className="text-xs text-muted-foreground italic border-t border-border/50 pt-1">
+                            {doc.notes}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">Document Type</th>
@@ -892,7 +1043,7 @@ export default function TruckDetailPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border">
-                <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
                   {[
                     { key: 'all', label: 'All', count: couplingStats?.all },
                     { key: 'active', label: 'Active', count: couplingStats?.active },
@@ -901,7 +1052,7 @@ export default function TruckDetailPage() {
                     <button
                       key={st.key}
                       onClick={() => setCouplingStatus(st.key)}
-                      className={`px-3 py-1.5 rounded-full font-medium transition-colors border cursor-pointer whitespace-nowrap ${
+                      className={`px-3 py-1.5 rounded-full font-medium transition-colors border cursor-pointer whitespace-nowrap shrink-0 ${
                         couplingStatus === st.key
                           ? 'bg-primary text-white border-primary font-semibold shadow-sm'
                           : 'bg-card text-muted-foreground border-border hover:text-foreground'
@@ -930,8 +1081,65 @@ export default function TruckDetailPage() {
                   />
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              {/* Mobile Coupling History Cards */}
+              <div className="block sm:hidden divide-y divide-border">
+                {isCouplingsLoading ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    Loading coupling history...
+                  </div>
+                ) : couplings.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    No coupling records match the current filters for this truck head.
+                  </div>
+                ) : (
+                  couplings.map((assignment) => (
+                    <div key={assignment.id} className="p-4 space-y-2 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Container className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-mono text-sm font-bold text-foreground">
+                            {assignment.trailer?.reg_number ?? `#${assignment.trailer_id}`}
+                          </span>
+                        </div>
+                        {!assignment.uncoupled_at && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            ACTIVE
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Coupled: </span>
+                          <span className="text-foreground">{formatDate(assignment.coupled_at)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Uncoupled: </span>
+                          <span className="text-foreground">
+                            {assignment.uncoupled_at ? formatDate(assignment.uncoupled_at) : '—'}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Odometer: </span>
+                          <span className="font-mono text-foreground">
+                            {formatKm(assignment.odometer_at_couple ?? 0)}
+                            {assignment.odometer_at_uncouple ? ` → ${formatKm(assignment.odometer_at_uncouple)}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                      {(assignment.uncouple_reason || assignment.couple_notes) && (
+                        <p className="text-xs text-muted-foreground italic border-t border-border/50 pt-1">
+                          {assignment.uncouple_reason || assignment.couple_notes}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        By: {assignment.uncoupled_by_user?.name || assignment.coupled_by_user?.name || '—'}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">Trailer</th>

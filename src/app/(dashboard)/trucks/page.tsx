@@ -515,7 +515,7 @@ export default function TrucksPage() {
             )}
 
             {/* Status Filter Chips with live counts */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
               {statusOptions.map((st) => {
                 const count =
                   st.key === 'all'
@@ -567,78 +567,162 @@ export default function TrucksPage() {
               onAction={hasActiveFilters ? resetFilters : openCreate}
             />
           ) : viewMode === 'table' ? (
-            <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-              <table className="w-full text-sm min-w-[760px]">
-                <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
-                  <tr>
-                    <th className="py-3 px-4 text-left font-medium">Plate Number</th>
-                    <th className="py-3 px-4 text-left font-medium">Vehicle Specs</th>
-                    <th className="py-3 px-4 text-left font-medium">Type & Capacity</th>
-                    <th className="py-3 px-4 text-left font-medium">Coupled Trailer</th>
-                    <th className="py-3 px-4 text-right font-medium">Odometer</th>
-                    <th className="py-3 px-4 text-center font-semibold text-primary">Trips Made</th>
-                    <th className="py-3 px-4 text-center font-medium">Status</th>
-                    <th className="py-3 px-4 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {trucks.map((truck) => (
-                    <tr key={truck.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="py-3.5 px-4">
+            <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+              {/* Mobile Cards (sm:hidden) */}
+              <div className="sm:hidden divide-y divide-border">
+                {trucks.map((truck) => (
+                  <div key={truck.id} className="p-3.5 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         <Link
                           href={`/trucks/${truck.id}`}
-                          className="font-mono font-bold text-sm text-primary hover:underline"
+                          className="font-mono font-bold text-sm text-primary hover:underline truncate block"
                         >
                           {truck.reg_number}
                         </Link>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <p className="font-medium text-foreground">{truck.make} {truck.model}</p>
-                        <p className="text-xs text-muted-foreground">{truck.year}</p>
-                      </td>
-                      <td className="py-3.5 px-4 text-foreground">
-                        <p className="font-medium text-xs">{truck.type}</p>
-                        <p className="text-xs text-muted-foreground tabular-nums">{truck.capacity_tons} tons</p>
-                      </td>
-                      <td className="py-3.5 px-4">
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {truck.make} {truck.model} ({truck.year})
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <StatusBadge status={truck.status} />
+                        {renderRowActions(truck)}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs py-1">
+                      <div>
+                        <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Type & Capacity</span>
+                        <span className="font-medium text-foreground">{truck.type}</span>
+                        <span className="text-[11px] text-muted-foreground block">{truck.capacity_tons} tons</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Odometer</span>
+                        <span className="font-mono font-medium text-foreground">{formatKm(truck.odometer_km)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-muted-foreground">Trailer:</span>
                         {truck.current_assignment?.trailer ? (
-                          <div>
-                            <p className="font-mono text-xs font-bold text-foreground">
-                              {truck.current_assignment.trailer.reg_number}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground capitalize">
-                              {truck.current_assignment.trailer.type.replace('_', ' ')} •{' '}
-                              {truck.current_assignment.trailer.capacity_tons}t
-                            </p>
-                          </div>
+                          <span className="font-mono font-bold text-foreground text-xs">
+                            {truck.current_assignment.trailer.reg_number}
+                          </span>
                         ) : (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => setCoupleTruck(truck)}
-                            className="h-7 px-2 text-[11px]"
+                            className="h-6 px-2 text-[10px]"
                           >
                             <Link2 className="mr-1 h-3 w-3" />
                             Couple
                           </Button>
                         )}
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-xs tabular-nums text-foreground">
-                        {formatKm(truck.odometer_km)}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
-                          {truck.completed_trips ?? 0} completed
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <StatusBadge status={truck.status} />
-                      </td>
-                      <td className="py-3.5 px-4 text-right">{renderRowActions(truck)}</td>
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
+                        {truck.completed_trips ?? 0} trips
+                      </span>
+                    </div>
+
+                    <div className="pt-1.5 border-t border-border/40 flex items-center justify-end gap-1.5">
+                      <Button asChild variant="outline" size="sm" className="h-7 text-xs px-2.5 flex-1">
+                        <Link href={`/trucks/${truck.id}`}>
+                          <span>Performance & Trips</span>
+                          <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                      {canManage && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2.5"
+                          onClick={() => openEdit(truck)}
+                          title="Edit truck"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table (hidden sm:block) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[760px]">
+                  <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
+                    <tr>
+                      <th className="py-3 px-4 text-left font-medium">Plate Number</th>
+                      <th className="py-3 px-4 text-left font-medium">Vehicle Specs</th>
+                      <th className="py-3 px-4 text-left font-medium">Type & Capacity</th>
+                      <th className="py-3 px-4 text-left font-medium">Coupled Trailer</th>
+                      <th className="py-3 px-4 text-right font-medium">Odometer</th>
+                      <th className="py-3 px-4 text-center font-semibold text-primary">Trips Made</th>
+                      <th className="py-3 px-4 text-center font-medium">Status</th>
+                      <th className="py-3 px-4 text-right font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {trucks.map((truck) => (
+                      <tr key={truck.id} className="hover:bg-muted/40 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <Link
+                            href={`/trucks/${truck.id}`}
+                            className="font-mono font-bold text-sm text-primary hover:underline"
+                          >
+                            {truck.reg_number}
+                          </Link>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="font-medium text-foreground">{truck.make} {truck.model}</p>
+                          <p className="text-xs text-muted-foreground">{truck.year}</p>
+                        </td>
+                        <td className="py-3.5 px-4 text-foreground">
+                          <p className="font-medium text-xs">{truck.type}</p>
+                          <p className="text-xs text-muted-foreground tabular-nums">{truck.capacity_tons} tons</p>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {truck.current_assignment?.trailer ? (
+                            <div>
+                              <p className="font-mono text-xs font-bold text-foreground">
+                                {truck.current_assignment.trailer.reg_number}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground capitalize">
+                                {truck.current_assignment.trailer.type.replace('_', ' ')} •{' '}
+                                {truck.current_assignment.trailer.capacity_tons}t
+                              </p>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCoupleTruck(truck)}
+                              className="h-7 px-2 text-[11px]"
+                            >
+                              <Link2 className="mr-1 h-3 w-3" />
+                              Couple
+                            </Button>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono text-xs tabular-nums text-foreground">
+                          {formatKm(truck.odometer_km)}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
+                            {truck.completed_trips ?? 0} completed
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <StatusBadge status={truck.status} />
+                        </td>
+                        <td className="py-3.5 px-4 text-right">{renderRowActions(truck)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             /* Cards View */
