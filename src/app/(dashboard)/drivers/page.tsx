@@ -175,17 +175,28 @@ export default function DriversPage() {
               className="pl-9 h-9 text-xs w-full"
             />
           </div>
-          <select value={licenseFilter} onChange={(e) => { setLicenseFilter(e.target.value); setPage(1); }} className="h-9 rounded-md border border-input bg-card px-2 text-xs text-foreground">
+          <select
+            value={licenseFilter}
+            onChange={(e) => { setLicenseFilter(e.target.value); setPage(1); }}
+            className="h-9 w-full sm:w-auto rounded-md border border-input bg-card px-2 text-xs text-foreground"
+          >
             <option value="all">All license statuses</option>
             <option value="expired">Expired</option>
             <option value="expiring_soon">Expiring within 30 days</option>
             <option value="valid">Valid (&gt;30 days)</option>
           </select>
           {(search || statusFilter !== 'all' || licenseFilter !== 'all') && (
-            <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setStatusFilter('all'); setLicenseFilter('all'); setPage(1); }} className="w-fit">Clear</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setSearch(''); setStatusFilter('all'); setLicenseFilter('all'); setPage(1); }}
+              className="w-full sm:w-auto text-xs"
+            >
+              Clear filters
+            </Button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
           {['all', 'active', 'on_trip', 'on_leave', 'inactive'].map((st) => (
             <button
               key={st}
@@ -218,84 +229,159 @@ export default function DriversPage() {
           onAction={() => setSheetOpen(true)}
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm min-w-[700px]">
-            <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
-              <tr>
-                <th className="py-3 px-4 text-left font-medium">Driver Name</th>
-                <th className="py-3 px-4 text-left font-medium">Phone & Contact</th>
-                <th className="py-3 px-4 text-left font-medium">Licence No</th>
-                <th className="py-3 px-4 text-left font-medium">Licence Expiry</th>
-                <th className="py-3 px-4 text-center font-semibold text-primary">Trips Made</th>
-                <th className="py-3 px-4 text-center font-medium">Status</th>
-                <th className="py-3 px-4 text-right font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {drivers.map((driver) => {
-                const licenceAlert = getLicenceAlert(driver.licence_expiry);
-
-                return (
-                  <tr key={driver.id} className="hover:bg-muted/40 transition-colors">
-                    <td className="py-3.5 px-4">
+        <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+          {/* Mobile Cards View (sm:hidden) */}
+          <div className="sm:hidden divide-y divide-border">
+            {drivers.map((driver) => {
+              const licenceAlert = getLicenceAlert(driver.licence_expiry);
+              return (
+                <div key={driver.id} className="p-3.5 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
                       <Link
                         href={`/drivers/${driver.id}`}
-                        className="font-semibold text-sm text-foreground hover:text-primary hover:underline"
+                        className="font-semibold text-sm text-foreground hover:text-primary hover:underline truncate block"
                       >
                         {driver.name}
                       </Link>
                       {driver.user && (
-                        <p className="text-[11px] text-muted-foreground">Mobile App User</p>
+                        <p className="text-[10px] text-muted-foreground">Mobile App User</p>
                       )}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-xs text-foreground">
-                      {driver.phone}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-xs text-foreground">
-                      {driver.licence_no}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="text-muted-foreground tabular-nums">
-                          {formatDate(driver.licence_expiry)}
-                        </span>
-                        {licenceAlert && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${licenceAlert.cls}`}>
-                            <AlertTriangle className="h-3 w-3" />
-                            <span>{licenceAlert.label}</span>
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
-                        {driver.completed_trips ?? 0} completed
+                    </div>
+                    <StatusBadge status={driver.status} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs py-1">
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Phone</span>
+                      <span className="font-mono text-foreground text-xs">{driver.phone}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Licence #</span>
+                      <span className="font-mono text-foreground text-xs">{driver.licence_no}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-muted-foreground tabular-nums text-[11px]">
+                        Exp: {formatDate(driver.licence_expiry)}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <StatusBadge status={driver.status} />
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button asChild variant="ghost" size="sm" title="View profile">
-                          <Link href={`/drivers/${driver.id}`}><Eye className="h-4 w-4" /></Link>
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(driver)} title="Edit driver">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(driver)} title="Delete/deactivate driver" className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div className="flex items-center justify-between p-3 border-t border-border text-xs">
-            <span className="text-muted-foreground">Page {meta?.current_page ?? page} of {meta?.last_page ?? 1} • {meta?.total ?? drivers.length} drivers</span>
-            <div className="flex gap-2">
+                      {licenceAlert && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${licenceAlert.cls}`}>
+                          <AlertTriangle className="h-2.5 w-2.5" />
+                          <span>{licenceAlert.label}</span>
+                        </span>
+                      )}
+                    </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
+                      {driver.completed_trips ?? 0} trips
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-border/40">
+                    <Button asChild variant="outline" size="sm" className="h-7 text-xs px-2.5">
+                      <Link href={`/drivers/${driver.id}`}>
+                        <Eye className="h-3.5 w-3.5 mr-1" /> View
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => openEdit(driver)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2.5 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteTarget(driver)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop Table View (hidden sm:block) */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
+                <tr>
+                  <th className="py-3 px-4 text-left font-medium">Driver Name</th>
+                  <th className="py-3 px-4 text-left font-medium">Phone & Contact</th>
+                  <th className="py-3 px-4 text-left font-medium">Licence No</th>
+                  <th className="py-3 px-4 text-left font-medium">Licence Expiry</th>
+                  <th className="py-3 px-4 text-center font-semibold text-primary">Trips Made</th>
+                  <th className="py-3 px-4 text-center font-medium">Status</th>
+                  <th className="py-3 px-4 text-right font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {drivers.map((driver) => {
+                  const licenceAlert = getLicenceAlert(driver.licence_expiry);
+
+                  return (
+                    <tr key={driver.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <Link
+                          href={`/drivers/${driver.id}`}
+                          className="font-semibold text-sm text-foreground hover:text-primary hover:underline"
+                        >
+                          {driver.name}
+                        </Link>
+                        {driver.user && (
+                          <p className="text-[11px] text-muted-foreground">Mobile App User</p>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-xs text-foreground">
+                        {driver.phone}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-xs text-foreground">
+                        {driver.licence_no}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-muted-foreground tabular-nums">
+                            {formatDate(driver.licence_expiry)}
+                          </span>
+                          {licenceAlert && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${licenceAlert.cls}`}>
+                              <AlertTriangle className="h-3 w-3" />
+                              <span>{licenceAlert.label}</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
+                          {driver.completed_trips ?? 0} completed
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <StatusBadge status={driver.status} />
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <Button asChild variant="ghost" size="sm" title="View profile">
+                            <Link href={`/drivers/${driver.id}`}><Eye className="h-4 w-4" /></Link>
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(driver)} title="Edit driver">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(driver)} title="Delete/deactivate driver" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 border-t border-border text-xs">
+            <span className="text-muted-foreground text-center sm:text-left">Page {meta?.current_page ?? page} of {meta?.last_page ?? 1} • {meta?.total ?? drivers.length} drivers</span>
+            <div className="flex gap-2 w-full sm:w-auto justify-center">
               <Button size="sm" variant="outline" disabled={(meta?.current_page ?? page) <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
               <Button size="sm" variant="outline" disabled={(meta?.current_page ?? page) >= (meta?.last_page ?? 1)} onClick={() => setPage((p) => p + 1)}>Next</Button>
             </div>
@@ -305,7 +391,7 @@ export default function DriversPage() {
 
       {/* Add Driver Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Register Driver</SheetTitle>
             <SheetDescription>Add a commercial vehicle driver to the organization.</SheetDescription>
@@ -342,9 +428,9 @@ export default function DriversPage() {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-            <SheetFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} disabled={createMutation.isPending}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Saving...' : 'Register Driver'}</Button>
+            <SheetFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setSheetOpen(false)} disabled={createMutation.isPending}>Cancel</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={createMutation.isPending}>{createMutation.isPending ? 'Saving...' : 'Register Driver'}</Button>
             </SheetFooter>
           </form>
         </SheetContent>
@@ -352,7 +438,7 @@ export default function DriversPage() {
 
       {/* Edit Driver Sheet */}
       <Sheet open={editOpen} onOpenChange={(o) => { setEditOpen(o); if (!o) setEditingDriver(null); }}>
-        <SheetContent side="right" className="sm:max-w-md">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Edit Driver</SheetTitle>
             <SheetDescription>Update driver profile, licence, and status.</SheetDescription>
@@ -389,9 +475,9 @@ export default function DriversPage() {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-            <SheetFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={updateMutation.isPending}>Cancel</Button>
-              <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
+            <SheetFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setEditOpen(false)} disabled={updateMutation.isPending}>Cancel</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
             </SheetFooter>
           </form>
         </SheetContent>
@@ -399,16 +485,16 @@ export default function DriversPage() {
 
       {/* Delete/Deactivate Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle className="text-destructive">Remove Driver</DialogTitle>
             <DialogDescription>
               {deleteTarget ? `Remove ${deleteTarget.name}? Drivers with trip history will be deactivated instead of permanently deleted.` : ''}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>Cancel</Button>
-            <Button variant="destructive" onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} disabled={deleteMutation.isPending}>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>Cancel</Button>
+            <Button variant="destructive" className="w-full sm:w-auto" onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? 'Removing...' : 'Remove Driver'}
             </Button>
           </DialogFooter>

@@ -161,20 +161,51 @@ export default function DriverDetailPage() {
 
       {/* Tabs: Trips, Advances & History */}
       <Tabs defaultValue="trips" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md h-10">
-          <TabsTrigger value="trips">Trips Made ({driver.trips?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="advances">Advances ({driver.advances?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+        <TabsList className="flex items-center justify-start overflow-x-auto no-scrollbar w-full max-w-md h-auto p-1 gap-1 text-xs sm:grid sm:grid-cols-3 sm:h-10">
+          <TabsTrigger value="trips" className="shrink-0 whitespace-nowrap">Trips Made ({driver.trips?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="advances" className="shrink-0 whitespace-nowrap">Advances ({driver.advances?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="history" className="shrink-0 whitespace-nowrap">History</TabsTrigger>
         </TabsList>
 
         {/* Trips Made Tab */}
         <TabsContent value="trips" className="mt-4">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Completed & Active Trips for {driver.name}</CardTitle>
+            <CardHeader className="p-4 sm:p-6 pb-3">
+              <CardTitle className="text-base sm:text-lg">Completed &amp; Active Trips for {driver.name}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              {/* Mobile View: Cards */}
+              <div className="sm:hidden divide-y divide-border">
+                {driver.trips?.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">No trips assigned yet.</div>
+                ) : (
+                  driver.trips?.map((trip) => (
+                    <div key={trip.id} className="p-3.5 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <Link href={`/trips/${trip.id}`} className="font-mono font-bold text-primary text-sm hover:underline">
+                          {trip.reference}
+                        </Link>
+                        <StatusBadge status={trip.status} />
+                      </div>
+                      <div className="text-xs">
+                        <p className="font-semibold text-foreground">{trip.origin} → {trip.destination}</p>
+                        <p className="text-[11px] text-muted-foreground">{formatDate(trip.start_date)}</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                        <div className="text-muted-foreground">
+                          Truck: <span className="font-mono font-semibold text-foreground">{trip.truck?.reg_number || '—'}</span>
+                        </div>
+                        <div className="text-right">
+                          <MoneyText amount={trip.agreed_rate} size="sm" />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop View: Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
@@ -228,14 +259,57 @@ export default function DriverDetailPage() {
         {/* Advances History Tab */}
         <TabsContent value="advances" className="mt-4">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Advance Settlement Trail</CardTitle>
-              <CardDescription>
+            <CardHeader className="p-4 sm:p-6 pb-3">
+              <CardTitle className="text-base sm:text-lg">Advance Settlement Trail</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Audit history of allowances, accepted receipts, and cash returned
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              {/* Mobile View: Cards */}
+              <div className="sm:hidden divide-y divide-border">
+                {driver.advances?.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    No cash advances recorded for this driver.
+                  </div>
+                ) : (
+                  driver.advances?.map((adv) => (
+                    <div key={adv.id} className="p-3.5 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-primary">
+                          {adv.trip_reference || 'Trip Settlement'}
+                        </span>
+                        <StatusBadge status={adv.status} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">1. Given</span>
+                          <MoneyText amount={adv.amount_given} size="sm" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">2. Accepted</span>
+                          <MoneyText amount={adv.expenses_accepted} variant="positive" size="sm" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">3. Returned</span>
+                          <MoneyText amount={adv.amount_returned} size="sm" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block font-semibold">Balance Due</span>
+                          <MoneyText
+                            amount={adv.balance_remaining}
+                            variant={adv.balance_remaining > 0 ? 'negative' : 'positive'}
+                            size="sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop View: Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
@@ -293,7 +367,7 @@ export default function DriverDetailPage() {
         <TabsContent value="history" className="mt-4">
           <Card className="p-4">
             <CardHeader className="px-0 pt-0 pb-3">
-              <CardTitle className="text-base">Driver Profile & Licence Audit Trail</CardTitle>
+              <CardTitle className="text-base">Driver Profile &amp; Licence Audit Trail</CardTitle>
               <CardDescription>
                 Changes to phone, status, and compliance licence details.
               </CardDescription>
@@ -304,40 +378,60 @@ export default function DriverDetailPage() {
       </Tabs>
 
       <Sheet open={editOpen} onOpenChange={setEditOpen}>
-        <SheetContent side="right" className="sm:max-w-md">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Edit Driver</SheetTitle>
             <SheetDescription>Update driver profile, licence, and status.</SheetDescription>
           </SheetHeader>
           <form onSubmit={editForm.handleSubmit((d) => updateMutation.mutate(d))} className="space-y-4 py-4">
-            <div><label className="text-xs font-semibold block mb-1">Full Name</label><Input {...editForm.register('name')} />{editForm.formState.errors.name && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.name.message}</p>}</div>
-            <div><label className="text-xs font-semibold block mb-1">Phone</label><Input {...editForm.register('phone')} />{editForm.formState.errors.phone && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.phone.message}</p>}</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-xs font-semibold block mb-1">Licence #</label><Input {...editForm.register('licence_no')} className="font-mono uppercase" />{editForm.formState.errors.licence_no && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.licence_no.message}</p>}</div>
-              <div><label className="text-xs font-semibold block mb-1">Licence Expiry</label><Input type="date" {...editForm.register('licence_expiry')} />{editForm.formState.errors.licence_expiry && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.licence_expiry.message}</p>}</div>
+            <div>
+              <label className="text-xs font-semibold block mb-1">Full Name</label>
+              <Input {...editForm.register('name')} />
+              {editForm.formState.errors.name && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.name.message}</p>}
             </div>
-            <div><label className="text-xs font-semibold block mb-1">Status</label>
+            <div>
+              <label className="text-xs font-semibold block mb-1">Phone</label>
+              <Input {...editForm.register('phone')} />
+              {editForm.formState.errors.phone && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.phone.message}</p>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold block mb-1">Licence #</label>
+                <Input {...editForm.register('licence_no')} className="font-mono uppercase" />
+                {editForm.formState.errors.licence_no && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.licence_no.message}</p>}
+              </div>
+              <div>
+                <label className="text-xs font-semibold block mb-1">Licence Expiry</label>
+                <Input type="date" {...editForm.register('licence_expiry')} />
+                {editForm.formState.errors.licence_expiry && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.licence_expiry.message}</p>}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1">Status</label>
               <select {...editForm.register('status')} className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm">
-                <option value="active">Active</option><option value="on_trip">On Trip</option><option value="on_leave">On Leave</option><option value="inactive">Inactive</option>
+                <option value="active">Active</option>
+                <option value="on_trip">On Trip</option>
+                <option value="on_leave">On Leave</option>
+                <option value="inactive">Inactive</option>
               </select>
             </div>
-            <SheetFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={updateMutation.isPending}>Cancel</Button>
-              <Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
+            <SheetFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setEditOpen(false)} disabled={updateMutation.isPending}>Cancel</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
             </SheetFooter>
           </form>
         </SheetContent>
       </Sheet>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle className="text-destructive">Remove Driver</DialogTitle>
             <DialogDescription>Remove {driver.name}? Drivers with trip history will be deactivated instead of permanently deleted.</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleteMutation.isPending}>Cancel</Button>
-            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>{deleteMutation.isPending ? 'Removing...' : 'Remove Driver'}</Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setDeleteOpen(false)} disabled={deleteMutation.isPending}>Cancel</Button>
+            <Button variant="destructive" className="w-full sm:w-auto" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>{deleteMutation.isPending ? 'Removing...' : 'Remove Driver'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
