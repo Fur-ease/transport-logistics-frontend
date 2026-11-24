@@ -109,7 +109,7 @@ export default function DriverDetailPage() {
           { label: driver.name },
         ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={driver.status} />
             <Button size="sm" variant="outline" onClick={openEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
             <Button size="sm" variant="destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Delete</Button>
@@ -175,7 +175,7 @@ export default function DriverDetailPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">Trip Ref</th>
@@ -236,7 +236,7 @@ export default function DriverDetailPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">Trip Ref</th>

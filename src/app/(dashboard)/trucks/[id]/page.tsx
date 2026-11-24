@@ -349,7 +349,7 @@ export default function TruckDetailPage() {
 
       {/* 6 Tabs: Overview, Trips, Fuel, Maintenance, Documents, History */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto p-1">
+        <TabsList className="flex items-center justify-start overflow-x-auto w-full p-1 h-auto text-xs">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="trips">Trips ({truck.trips_count ?? 0})</TabsTrigger>
           <TabsTrigger value="fuel">Fuel Logs</TabsTrigger>

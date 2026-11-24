@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
@@ -462,7 +462,7 @@ export default function TripProfitSheetPage() {
       </Card>
 
       {/* Summary KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <StatCard
           title="Trips Included"
           value={isLoading ? '...' : formatNumber(summary?.trips_count || 0)}
@@ -540,7 +540,7 @@ export default function TripProfitSheetPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs min-w-[850px]">
                 <thead className="bg-secondary/60 text-muted-foreground uppercase border-y border-border">
                   <tr>
                     <th className="py-2.5 px-3 text-left font-medium">Truck Reg</th>
@@ -603,7 +603,7 @@ export default function TripProfitSheetPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[1100px]">
               <thead className="bg-secondary/70 text-muted-foreground uppercase border-y border-border">
                 <tr>
                   <th

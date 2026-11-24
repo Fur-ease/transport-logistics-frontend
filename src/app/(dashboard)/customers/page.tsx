@@ -124,14 +124,14 @@ export default function CustomersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[220px] max-w-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search name, phone, email..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-9 h-9 text-xs"
+            className="pl-9 h-9 text-xs w-full"
           />
         </div>
         <select
@@ -144,7 +144,7 @@ export default function CustomersPage() {
           <option value="no">No balance</option>
         </select>
         {(search || hasBalance) && (
-          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setHasBalance(''); setPage(1); }}>Clear</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setHasBalance(''); setPage(1); }} className="w-fit">Clear</Button>
         )}
       </div>
 
@@ -165,7 +165,7 @@ export default function CustomersPage() {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[750px]">
             <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
               <tr>
                 <th className="py-3 px-4 text-left font-medium">Customer</th>

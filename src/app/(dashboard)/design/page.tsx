@@ -102,7 +102,7 @@ export default function DesignSystemPage() {
 
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground uppercase font-semibold">Tabular Numerics & References (JetBrains Mono & Tabular Figures)</span>
-              <div className="flex flex-wrap items-center gap-6 pt-2 font-mono text-sm">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-6 pt-2 font-mono text-xs sm:text-sm">
                 <div>
                   <span className="text-xs text-muted-foreground block font-sans">Trip Reference:</span>
                   <span className="font-bold text-primary">TRIP-0042</span>

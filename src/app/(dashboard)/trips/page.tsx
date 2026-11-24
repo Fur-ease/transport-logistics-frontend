@@ -468,17 +468,17 @@ export default function TripsPage() {
       {/* Toolbar & Filters */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1 w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search ref, route, cargo, plate, driver..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9 h-9 text-xs"
+              className="pl-9 h-9 text-xs w-full"
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -498,7 +498,7 @@ export default function TripsPage() {
         </div>
 
         {filtersOpen && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
             <div>
               <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Truck</label>
               <select
@@ -594,14 +594,14 @@ export default function TripsPage() {
         )}
 
         {/* Status Filter Chips with live counts */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs">
           {statusOptions.map((st) => {
             const count = st.key === 'all' ? stats?.all : stats?.[st.key];
             return (
               <button
                 key={st.key}
                 onClick={() => setStatusFilter(st.key)}
-                className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap ${statusFilter === st.key
+                className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap shrink-0 ${statusFilter === st.key
                   ? 'bg-primary text-white border-primary font-semibold shadow-sm'
                   : 'bg-card text-muted-foreground border-border hover:text-foreground'
                   }`}
@@ -642,7 +642,7 @@ export default function TripsPage() {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[1000px]">
             <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
               <tr>
                 <th className="py-3 px-4 text-left font-medium">Trip Ref</th>
@@ -855,7 +855,7 @@ export default function TripsPage() {
             </div>
 
             {/* Driver & Customer */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Driver</label>
                 <select
@@ -893,7 +893,7 @@ export default function TripsPage() {
             </div>
 
             {/* Origin & Destination */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Origin City/Depot</label>
                 <Input placeholder="e.g. Mombasa Port" {...register('origin')} />
@@ -911,8 +911,8 @@ export default function TripsPage() {
             </div>
 
             {/* Cargo description & weight */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="text-xs font-semibold text-foreground block mb-1">Cargo Description</label>
                 <Input placeholder="e.g. 40ft Container, Steel Coils" {...register('cargo_description')} />
                 {errors.cargo_description && (
@@ -929,7 +929,7 @@ export default function TripsPage() {
             </div>
 
             {/* Agreed Rate (Revenue) & Start Odometer */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">
                   Agreed Rate (KES Revenue)
@@ -951,7 +951,7 @@ export default function TripsPage() {
             </div>
 
             {/* Dates */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Trip Start Date</label>
                 <Input type="date" {...register('start_date')} />

@@ -624,7 +624,7 @@ export default function TripDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs">
                   <div className="p-3 rounded-lg bg-secondary/50 border border-border">
                     <span className="text-muted-foreground block text-[11px] mb-1">Truck Assigned</span>
                     <Link href={`/trucks/${trip.truck_id}`} className="font-mono font-bold text-sm text-primary hover:underline">

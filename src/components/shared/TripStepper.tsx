@@ -29,8 +29,8 @@ export function TripStepper({ currentStatus, className }: TripStepperProps) {
   const currentIndex = STEPS.findIndex((s) => s.key === currentStatus);
 
   return (
-    <div className={cn('w-full py-2', className)}>
-      <div className="flex items-center justify-between">
+    <div className={cn('w-full py-2 overflow-x-auto', className)}>
+      <div className="flex items-center justify-between min-w-[280px]">
         {STEPS.map((step, index) => {
           const isCompleted = currentIndex > index;
           const isCurrent = currentIndex === index;
@@ -41,17 +41,17 @@ export function TripStepper({ currentStatus, className }: TripStepperProps) {
               <div className="flex flex-col items-center group">
                 <div
                   className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-full border text-xs font-semibold transition-all',
+                    'flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-full border text-xs font-semibold transition-all',
                     isCompleted && 'bg-primary border-primary text-white',
                     isCurrent && 'bg-primary/10 border-primary text-primary ring-2 ring-primary/20',
                     !isCompleted && !isCurrent && 'bg-secondary border-border text-muted-foreground'
                   )}
                 >
-                  {isCompleted ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
+                  {isCompleted ? <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <StepIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                 </div>
                 <span
                   className={cn(
-                    'mt-2 text-xs font-medium tracking-tight whitespace-nowrap',
+                    'mt-1.5 sm:mt-2 text-[10px] sm:text-xs font-medium tracking-tight whitespace-nowrap',
                     isCurrent && 'text-primary font-semibold',
                     isCompleted && 'text-foreground',
                     !isCompleted && !isCurrent && 'text-muted-foreground'
@@ -64,7 +64,7 @@ export function TripStepper({ currentStatus, className }: TripStepperProps) {
               {index < STEPS.length - 1 && (
                 <div
                   className={cn(
-                    'h-[2px] flex-1 mx-2 -mt-5 transition-all',
+                    'h-[2px] flex-1 mx-1 sm:mx-2 -mt-4 sm:-mt-5 transition-all',
                     currentIndex > index ? 'bg-primary' : 'bg-border'
                   )}
                 />

@@ -66,7 +66,7 @@ export default function DashboardLayout({
           </div>
         )}
         <Topbar />
-        <main className="flex-1 pb-20 md:pb-10 pt-6 px-4 sm:px-6 md:px-8 max-w-[1440px] w-full mx-auto">
+        <main className="flex-1 pb-20 md:pb-10 pt-4 sm:pt-6 px-3 sm:px-6 md:px-8 max-w-[1440px] w-full mx-auto">
           {children}
         </main>
         <MobileBottomNav />

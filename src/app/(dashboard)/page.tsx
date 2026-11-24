@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -119,8 +119,8 @@ export default function DashboardPage() {
       />
 
       <Card>
-        <CardContent className="p-3 flex flex-col lg:flex-row lg:items-end gap-3">
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/30 p-1 text-xs w-fit">
+        <CardContent className="p-3 sm:p-4 flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/30 p-1 text-xs w-full sm:w-fit">
             {([
               ['30', 'Last 30 Days'],
               ['this_month', 'This Month'],
@@ -130,38 +130,40 @@ export default function DashboardPage() {
               <button
                 key={key}
                 onClick={() => setPreset(key)}
-                className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
-                  preset === key ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'
+                className={`flex-1 sm:flex-none text-center px-2.5 sm:px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+                  preset === key ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs text-muted-foreground">
-              <span className="block mb-1 font-medium">From</span>
-              <input
-                type="date"
-                value={fromDate}
-                max={toDate}
-                onChange={(e) => { setFromDate(e.target.value); setPreset('custom'); }}
-                className="h-9 rounded-md border border-input bg-card px-2 text-sm text-foreground"
-              />
-            </label>
-            <label className="text-xs text-muted-foreground">
-              <span className="block mb-1 font-medium">To</span>
-              <input
-                type="date"
-                value={toDate}
-                min={fromDate}
-                max={toIsoDate(today)}
-                onChange={(e) => { setToDate(e.target.value); setPreset('custom'); }}
-                className="h-9 rounded-md border border-input bg-card px-2 text-sm text-foreground"
-              />
-            </label>
-            <div className="text-xs text-muted-foreground pb-2">
-              Showing <span className="font-semibold text-foreground">{formatDate(fromDate)}</span> â€“ <span className="font-semibold text-foreground">{formatDate(toDate)}</span>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-2 w-full lg:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs text-muted-foreground flex-1 sm:flex-none">
+                <span className="block mb-1 font-medium">From</span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate}
+                  onChange={(e) => { setFromDate(e.target.value); setPreset('custom'); }}
+                  className="h-9 w-full sm:w-auto rounded-md border border-input bg-card px-2 text-sm text-foreground"
+                />
+              </label>
+              <label className="text-xs text-muted-foreground flex-1 sm:flex-none">
+                <span className="block mb-1 font-medium">To</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate}
+                  max={toIsoDate(today)}
+                  onChange={(e) => { setToDate(e.target.value); setPreset('custom'); }}
+                  className="h-9 w-full sm:w-auto rounded-md border border-input bg-card px-2 text-sm text-foreground"
+                />
+              </label>
+            </div>
+            <div className="text-xs text-muted-foreground sm:pb-2">
+              Showing <span className="font-semibold text-foreground">{formatDate(fromDate)}</span> – <span className="font-semibold text-foreground">{formatDate(toDate)}</span>
             </div>
           </div>
         </CardContent>
@@ -284,7 +286,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trips Per Truck Bar Chart (2 cols) */}
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
             <div>
               <CardTitle>Trips Made Per Truck</CardTitle>
               <CardDescription>
@@ -292,7 +294,7 @@ export default function DashboardPage() {
                 {truckRows.length > 25 ? ` (showing top 25 of ${truckRows.length})` : ''}
               </CardDescription>
             </div>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="w-fit">
               <Link href="/reports">
                 <span>View Full Report</span>
                 <ArrowRight className="ml-1 h-3.5 w-3.5" />
@@ -459,12 +461,12 @@ export default function DashboardPage() {
 
       {/* Recent Trips Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3">
           <div>
             <CardTitle>Recent Trips</CardTitle>
             <CardDescription>Latest dispatch activity across the transport network</CardDescription>
           </div>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" className="w-fit">
             <Link href="/trips">
               <span>View All Trips</span>
               <ArrowRight className="ml-1 h-3.5 w-3.5" />
@@ -473,7 +475,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                 <tr>
                   <th className="py-3 px-4 text-left font-medium">Reference</th>

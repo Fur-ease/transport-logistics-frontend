@@ -283,7 +283,7 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="organization" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 h-auto p-1">
+        <TabsList className="flex items-center justify-start overflow-x-auto w-full p-1 h-auto text-xs">
           <TabsTrigger value="organization">Organization</TabsTrigger>
           <TabsTrigger value="users">Team &amp; Roles ({usersMeta?.total ?? teamMembers.length})</TabsTrigger>
           <TabsTrigger value="thresholds">Alert Thresholds</TabsTrigger>
@@ -497,7 +497,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">User</th>
@@ -642,7 +642,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-xs min-w-[700px]">
                   <thead className="bg-secondary/60 text-muted-foreground uppercase border-y border-border">
                     <tr>
                       <th className="py-2.5 px-3 text-left font-medium">Rule &amp; Detection Scope</th>
@@ -744,7 +744,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
                       <th className="py-3 px-4 text-left font-medium">Timestamp</th>

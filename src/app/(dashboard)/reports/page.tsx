@@ -84,18 +84,22 @@ export default function ReportsPage() {
       />
 
       <Card>
-        <CardContent className="p-3 flex flex-col xl:flex-row xl:items-end gap-3">
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/30 p-1 text-xs w-fit">
+        <CardContent className="p-3 sm:p-4 flex flex-col xl:flex-row xl:items-end gap-3">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/30 p-1 text-xs w-full sm:w-fit">
             {([['30','Last 30 Days'],['90','Last 90 Days'],['this_month','This Month'],['custom','Custom']] as const).map(([k,l]) => (
-              <button key={k} onClick={() => setPreset(k)} className={`px-3 py-1.5 rounded-md font-medium ${preset===k?'bg-primary text-white':'text-muted-foreground hover:text-foreground'}`}>{l}</button>
+              <button key={k} onClick={() => setPreset(k)} className={`flex-1 sm:flex-none text-center px-2.5 sm:px-3 py-1.5 rounded-md font-medium transition-colors ${preset===k?'bg-primary text-white shadow-sm':'text-muted-foreground hover:text-foreground'}`}>{l}</button>
             ))}
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs text-muted-foreground"><span className="block mb-1 font-medium">From</span><input type="date" value={dateFrom} max={dateTo} onChange={e=>{setDateFrom(e.target.value);setPreset('custom');}} className="h-9 rounded-md border border-input bg-card px-2 text-sm" /></label>
-            <label className="text-xs text-muted-foreground"><span className="block mb-1 font-medium">To</span><input type="date" value={dateTo} min={dateFrom} onChange={e=>{setDateTo(e.target.value);setPreset('custom');}} className="h-9 rounded-md border border-input bg-card px-2 text-sm" /></label>
-            <div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search in current tab..." className="pl-8 h-9 w-56 text-xs" /></div>
-            <Button variant="ghost" size="sm" onClick={() => { refetchTpt(); }} disabled={tptFetching} className="h-9 text-xs"><RefreshCw className={`mr-1 h-3.5 w-3.5 ${tptFetching?'animate-spin':''}`} />Refresh</Button>
-            <span className="text-[11px] text-muted-foreground pb-2">Live auto-refresh 15s{dataUpdatedAt?` • ${new Date(dataUpdatedAt).toLocaleTimeString()}`:''}</span>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-2 w-full xl:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs text-muted-foreground flex-1 sm:flex-none"><span className="block mb-1 font-medium">From</span><input type="date" value={dateFrom} max={dateTo} onChange={e=>{setDateFrom(e.target.value);setPreset('custom');}} className="h-9 w-full sm:w-auto rounded-md border border-input bg-card px-2 text-sm" /></label>
+              <label className="text-xs text-muted-foreground flex-1 sm:flex-none"><span className="block mb-1 font-medium">To</span><input type="date" value={dateTo} min={dateFrom} onChange={e=>{setDateTo(e.target.value);setPreset('custom');}} className="h-9 w-full sm:w-auto rounded-md border border-input bg-card px-2 text-sm" /></label>
+            </div>
+            <div className="relative w-full sm:w-auto"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search in current tab..." className="pl-8 h-9 w-full sm:w-56 text-xs" /></div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { refetchTpt(); }} disabled={tptFetching} className="h-9 text-xs"><RefreshCw className={`mr-1 h-3.5 w-3.5 ${tptFetching?'animate-spin':''}`} />Refresh</Button>
+              <span className="text-[11px] text-muted-foreground sm:pb-2">Auto 15s{dataUpdatedAt?` • ${new Date(dataUpdatedAt).toLocaleTimeString()}`:''}</span>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -109,7 +113,7 @@ export default function ReportsPage() {
         </TabsList>
 
         <TabsContent value="trips_per_truck" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Agreed</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_agreed_revenue ?? tpt?.summary?.total_revenue ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Credit Notes</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_credit_notes ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Net Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(tpt?.summary?.total_revenue ?? 0)}</p></Card>
@@ -118,7 +122,7 @@ export default function ReportsPage() {
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Trips</span><p className="text-xl font-bold text-primary mt-1">{tpt?.summary?.total_trips_made ?? 0}</p></Card>
           </div>
           <Card><CardHeader className="pb-2"><CardTitle>Trips Completed per Truck</CardTitle><CardDescription>Contribution from net revenue (agreed minus applied credit notes) minus approved direct expenses</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
+            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[700px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
               <th className="py-3 px-4 text-left">Reg</th><th className="py-3 px-4 text-center font-bold text-primary">Trips</th><th className="py-3 px-4 text-right">Agreed</th><th className="py-3 px-4 text-right">CN</th><th className="py-3 px-4 text-right">Net Rev</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-center">Util %</th>
             </tr></thead><tbody className="divide-y divide-border">
               {tptLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={8} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
@@ -136,7 +140,7 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="profitability" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Agreed</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_agreed_revenue ?? profData?.summary?.total_revenue ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Credit Notes</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_credit_notes ?? 0)}</p></Card>
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Net Revenue</span><p className="text-xl font-mono font-bold mt-1">{formatKES(profData?.summary?.total_revenue ?? 0)}</p></Card>
@@ -144,7 +148,7 @@ export default function ReportsPage() {
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">Contribution</span><p className="text-xl font-mono font-bold text-success mt-1">{formatKES(profData?.summary?.total_contribution ?? 0)}</p></Card>
           </div>
           <Card><CardHeader className="pb-2"><CardTitle>Trip Contribution Breakdown</CardTitle><CardDescription>{profData?.summary?.note || 'Net revenue minus approved direct trip expenses.'}</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
+            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[650px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
               <th className="py-3 px-4 text-left">Trip</th><th className="py-3 px-4 text-right">Agreed</th><th className="py-3 px-4 text-right">CN</th><th className="py-3 px-4 text-right">Net Rev</th><th className="py-3 px-4 text-right">Direct Costs</th><th className="py-3 px-4 text-right font-semibold text-success">Contribution</th><th className="py-3 px-4 text-right">Margin</th>
             </tr></thead><tbody className="divide-y divide-border">
               {profLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
@@ -159,7 +163,7 @@ export default function ReportsPage() {
             <Card className="p-4"><span className="text-xs font-medium uppercase text-muted-foreground">Total Fuel Cost</span><p className="text-2xl font-bold text-primary mt-1">{formatKES(fuelData?.summary?.total_fuel_cost ?? 0)}</p></Card>
           </div>
           <Card><CardHeader className="pb-2"><CardTitle>Refill Log & Anomaly Trail</CardTitle><CardDescription>Fuel entries with odometer/litre checks vs rolling average</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
+            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[650px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
               <th className="py-3 px-4 text-left">Date</th><th className="py-3 px-4 text-left">Truck</th><th className="py-3 px-4 text-left">Trip</th><th className="py-3 px-4 text-right">Litres</th><th className="py-3 px-4 text-right">Cost</th><th className="py-3 px-4 text-center">Km/L</th><th className="py-3 px-4 text-center">Audit</th>
             </tr></thead><tbody className="divide-y divide-border">
               {fuelLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :
@@ -174,7 +178,7 @@ export default function ReportsPage() {
             <Card className="p-3.5"><span className="text-[11px] text-muted-foreground uppercase">As of</span><p className="text-sm font-semibold mt-2">{agingData?.as_of_date ? formatDate(agingData.as_of_date) : '—'}</p></Card>
           </div>
           <Card><CardHeader className="pb-2"><CardTitle>Customer Receivables Ageing</CardTitle><CardDescription>Outstanding balances by ageing bucket (real-time invoice/payment/credit state)</CardDescription></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
+            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm min-w-[650px]"><thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border"><tr>
               <th className="py-3 px-4 text-left">Customer</th><th className="py-3 px-4 text-right font-bold text-destructive">Total Owed</th><th className="py-3 px-4 text-right">Current</th><th className="py-3 px-4 text-right">1–30</th><th className="py-3 px-4 text-right">31–60</th><th className="py-3 px-4 text-right text-destructive">61–90+</th>
             </tr></thead><tbody className="divide-y divide-border">
               {agingLoading ? [...Array(6)].map((_,i)=><tr key={i}><td colSpan={6} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>) :

@@ -166,13 +166,13 @@ export default function DriversPage() {
       {/* Toolbar & Filters */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1 w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search name, phone, licence..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="pl-9 h-9 text-xs"
+              className="pl-9 h-9 text-xs w-full"
             />
           </div>
           <select value={licenseFilter} onChange={(e) => { setLicenseFilter(e.target.value); setPage(1); }} className="h-9 rounded-md border border-input bg-card px-2 text-xs text-foreground">
@@ -182,15 +182,15 @@ export default function DriversPage() {
             <option value="valid">Valid (&gt;30 days)</option>
           </select>
           {(search || statusFilter !== 'all' || licenseFilter !== 'all') && (
-            <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setStatusFilter('all'); setLicenseFilter('all'); setPage(1); }}>Clear</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setStatusFilter('all'); setLicenseFilter('all'); setPage(1); }} className="w-fit">Clear</Button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs">
           {['all', 'active', 'on_trip', 'on_leave', 'inactive'].map((st) => (
             <button
               key={st}
               onClick={() => { setStatusFilter(st); setPage(1); }}
-              className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap shrink-0 ${
                 statusFilter === st
                   ? 'bg-primary text-white border-primary font-semibold shadow-sm'
                   : 'bg-card text-muted-foreground border-border hover:text-foreground'
@@ -219,7 +219,7 @@ export default function DriversPage() {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[700px]">
             <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
               <tr>
                 <th className="py-3 px-4 text-left font-medium">Driver Name</th>
@@ -321,7 +321,7 @@ export default function DriversPage() {
               <Input placeholder="+2547..." {...register('phone')} />
               {errors.phone && <p className="text-[11px] text-destructive mt-1">{errors.phone.message}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Driving Licence #</label>
                 <Input placeholder="DL-884219A" {...register('licence_no')} className="font-mono uppercase" />
@@ -368,7 +368,7 @@ export default function DriversPage() {
               <Input {...editForm.register('phone')} />
               {editForm.formState.errors.phone && <p className="text-[11px] text-destructive mt-1">{editForm.formState.errors.phone.message}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Driving Licence #</label>
                 <Input {...editForm.register('licence_no')} className="font-mono uppercase" />

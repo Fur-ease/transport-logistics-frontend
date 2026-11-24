@@ -275,7 +275,7 @@ export default function MissingEntriesPage() {
         backHref="/"
         backLabel="Back to dashboard"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -327,7 +327,7 @@ export default function MissingEntriesPage() {
       />
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           title="Open Data Issues"
           value={isLoading ? '...' : (summary?.total_open ?? 0)}
@@ -490,7 +490,7 @@ export default function MissingEntriesPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs min-w-[760px]">
               <thead className="bg-secondary/70 text-muted-foreground uppercase border-y border-border">
                 <tr>
                   <th className="py-3 px-3 text-left font-medium">Issue / Rule</th>

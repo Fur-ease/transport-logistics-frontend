@@ -203,7 +203,7 @@ export default function InvoicesPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard title="Invoices" value={data?.total ?? 0} subtitle={`${stats?.overdue ?? 0} overdue`} icon={<FileText className="h-4 w-4" />} />
         <StatCard title="Total Invoiced" value={formatKES(summary?.total_amount ?? 0)} subtitle="Filtered set" icon={<Building2 className="h-4 w-4" />} />
         <StatCard title="Total Received" value={formatKES(summary?.total_paid ?? 0)} subtitle="Valid payments" icon={<DollarSign className="h-4 w-4" />} valueClassName="text-success font-semibold" />
@@ -213,11 +213,11 @@ export default function InvoicesPage() {
 
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1 w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search invoice #, customer, trip..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)} className="pl-9 h-9 text-xs" />
+            <Input placeholder="Search invoice #, customer, trip..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)} className="pl-9 h-9 text-xs w-full" />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 justify-end">
             <Button variant="outline" size="sm" onClick={() => setFiltersOpen(v => !v)} className="h-9 text-xs">
               <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> Filters {hasActiveFilters && <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-primary" />}
             </Button>
@@ -226,7 +226,7 @@ export default function InvoicesPage() {
         </div>
 
         {filtersOpen && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
             <div>
               <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Customer</label>
               <select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="w-full h-9 px-2.5 rounded-lg border border-input bg-card text-xs text-foreground">
@@ -264,11 +264,11 @@ export default function InvoicesPage() {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs">
           {statusOptions.map(st => {
             const count = st.key === 'all' ? stats?.all : stats?.[st.key];
             return (
-              <button key={st.key} onClick={() => setStatusFilter(st.key)} className={`px-3 py-1.5 rounded-full font-medium transition-colors border whitespace-nowrap ${statusFilter === st.key ? 'bg-primary text-white border-primary' : 'bg-card text-muted-foreground border-border hover:text-foreground'}`}>
+              <button key={st.key} onClick={() => setStatusFilter(st.key)} className={`px-3 py-1.5 rounded-full font-medium transition-colors border whitespace-nowrap shrink-0 ${statusFilter === st.key ? 'bg-primary text-white border-primary' : 'bg-card text-muted-foreground border-border hover:text-foreground'}`}>
                 {st.label}{typeof count === 'number' && <span className={`ml-1.5 tabular-nums ${statusFilter === st.key ? 'text-white/80' : ''}`}>{count}</span>}
               </button>
             );
@@ -282,7 +282,7 @@ export default function InvoicesPage() {
         <EmptyState icon={<FileText className="h-8 w-8" />} title="No invoices found" description={hasActiveFilters ? 'No invoices match current filters.' : 'Invoices are issued from delivered trips.'} actionLabel={hasActiveFilters ? 'Clear Filters' : undefined} onAction={hasActiveFilters ? resetFilters : undefined} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[850px]">
             <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
               <tr>
                 <th className="py-3 px-4 text-left font-medium">Invoice #</th>
@@ -432,7 +432,7 @@ export default function InvoicesPage() {
           </DialogHeader>
           {detailsModalInvoice && (
             <div className="space-y-5 py-2 text-xs">
-              <div className="grid grid-cols-4 gap-2 p-3 rounded-lg bg-secondary/60 border border-border">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-lg bg-secondary/60 border border-border">
                 <div><span className="text-muted-foreground block text-[11px]">Invoice Total</span><span className="font-mono font-bold text-sm text-foreground">{formatKES(detailsModalInvoice.amount)}</span></div>
                 <div><span className="text-muted-foreground block text-[11px]">Valid Paid</span><span className="font-mono font-bold text-sm text-success">{formatKES(detailsModalInvoice.total_paid)}</span></div>
                 <div><span className="text-muted-foreground block text-[11px]">Credit Notes</span><span className="font-mono font-bold text-sm text-foreground">{formatKES(detailsModalInvoice.total_credited ?? 0)}</span></div>

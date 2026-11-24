@@ -148,20 +148,20 @@ export default function DriverMobileViewPage() {
           </span>
         </div>
         <CardContent className="p-4 space-y-3">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-2 rounded-lg bg-secondary">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+            <div className="p-2.5 rounded-lg bg-secondary">
               <span className="text-[10px] text-muted-foreground uppercase font-medium">Cash Given</span>
               <p className="text-sm font-bold font-mono text-foreground mt-0.5">
                 {formatKES(activeAdvance?.amount_given ?? 0)}
               </p>
             </div>
-            <div className="p-2 rounded-lg bg-secondary">
+            <div className="p-2.5 rounded-lg bg-secondary">
               <span className="text-[10px] text-muted-foreground uppercase font-medium">Expenses Accepted</span>
               <p className="text-sm font-bold font-mono text-success mt-0.5">
                 {formatKES(activeAdvance?.expenses_accepted ?? 0)}
               </p>
             </div>
-            <div className="p-2 rounded-lg bg-secondary">
+            <div className="p-2.5 rounded-lg bg-secondary">
               <span className="text-[10px] text-muted-foreground uppercase font-medium">Remaining Due</span>
               <p className="text-sm font-bold font-mono text-primary mt-0.5">
                 {formatKES(activeAdvance?.balance_remaining ?? 0)}
@@ -309,7 +309,7 @@ export default function DriverMobileViewPage() {
             </div>
 
             {watchCat === 'fuel' && (
-              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-secondary border border-border">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-secondary border border-border">
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">Litres</label>
                   <Input type="number" step="0.1" placeholder="e.g. 120" className="h-11" {...register('litres', { valueAsNumber: true })} />

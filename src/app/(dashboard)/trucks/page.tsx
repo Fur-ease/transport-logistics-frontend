@@ -331,9 +331,9 @@ export default function TrucksPage() {
         description="Manage truck heads and trailers as separate assets, then couple them into compliant haulage combinations."
         actions={
           fleetTab === 'heads' ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* View Mode Toggle */}
-              <div className="hidden sm:flex items-center rounded-lg border border-border bg-card p-1 shadow-sm">
+              <div className="flex items-center rounded-lg border border-border bg-card p-1 shadow-sm">
                 <button
                   onClick={() => setViewMode('table')}
                   className={`p-1.5 rounded-md transition-colors cursor-pointer ${
@@ -418,17 +418,17 @@ export default function TrucksPage() {
           {/* Filters & Search Toolbar */}
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative flex-1 w-full sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search plate (e.g. KDA 482B), make, model..."
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="pl-9 h-9 text-xs"
+                  className="pl-9 h-9 text-xs w-full"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 justify-end">
                 <Button
                   variant="outline"
                   size="sm"
@@ -450,7 +450,7 @@ export default function TrucksPage() {
             </div>
 
             {filtersOpen && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
                 <div>
                   <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
                     Vehicle Type
@@ -515,7 +515,7 @@ export default function TrucksPage() {
             )}
 
             {/* Status Filter Chips with live counts */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs">
               {statusOptions.map((st) => {
                 const count =
                   st.key === 'all'
@@ -525,7 +525,7 @@ export default function TrucksPage() {
                   <button
                     key={st.key}
                     onClick={() => setStatusFilter(st.key)}
-                    className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap ${
+                    className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap shrink-0 ${
                       statusFilter === st.key
                         ? 'bg-primary text-white border-primary font-semibold shadow-sm'
                         : 'bg-card text-muted-foreground border-border hover:text-foreground'
@@ -568,7 +568,7 @@ export default function TrucksPage() {
             />
           ) : viewMode === 'table' ? (
             <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[760px]">
                 <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
                   <tr>
                     <th className="py-3 px-4 text-left font-medium">Plate Number</th>

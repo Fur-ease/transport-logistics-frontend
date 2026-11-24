@@ -126,12 +126,12 @@ export default function DocumentsRegisterPage() {
       {/* Filter bar */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-56">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
+            <div className="relative flex-1 w-full sm:min-w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search document #, container #, seal #..."
-                className="pl-9"
+                className="pl-9 w-full text-xs"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -145,7 +145,7 @@ export default function DocumentsRegisterPage() {
                 setTypeFilter(e.target.value);
                 setPage(1);
               }}
-              className="h-10 px-3 rounded-lg border border-input bg-card text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-10 px-3 rounded-lg border border-input bg-card text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto"
             >
               <option value="">All Document Types</option>
               <option value="delivery_note">Delivery Note (DN)</option>
@@ -161,7 +161,7 @@ export default function DocumentsRegisterPage() {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="h-10 px-3 rounded-lg border border-input bg-card text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-10 px-3 rounded-lg border border-input bg-card text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto"
             >
               <option value="">All Statuses</option>
               <option value="pending">Pending</option>
@@ -191,7 +191,7 @@ export default function DocumentsRegisterPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[850px]">
               <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                 <tr>
                   <th className="py-2.5 px-4 text-left font-medium">Type</th>

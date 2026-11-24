@@ -18,8 +18,8 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, breadcrumbs, actions, backHref, backLabel }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8 pb-4 border-b border-border/60">
-      <div className="flex items-start gap-3">
+    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6 sm:mb-8 pb-4 border-b border-border/60">
+      <div className="flex items-start gap-3 min-w-0 flex-1">
         {backHref && (
           <Link
             href={backHref}
@@ -29,33 +29,33 @@ export function PageHeader({ title, description, breadcrumbs, actions, backHref,
             <ArrowLeft className="h-4 w-4" />
           </Link>
         )}
-        <div>
+        <div className="min-w-0 flex-1">
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav className="flex items-center space-x-1 text-xs text-muted-foreground mb-2">
+            <nav className="flex items-center space-x-1 text-xs text-muted-foreground mb-2 overflow-x-auto whitespace-nowrap pb-1">
               {breadcrumbs.map((item, index) => (
                 <React.Fragment key={index}>
-                  {index > 0 && <ChevronRight className="h-3 w-3" />}
+                  {index > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
                   {item.href ? (
-                    <Link href={item.href} className="hover:text-foreground transition-colors">
+                    <Link href={item.href} className="hover:text-foreground transition-colors shrink-0">
                       {item.label}
                     </Link>
                   ) : (
-                    <span className="text-foreground font-medium">{item.label}</span>
+                    <span className="text-foreground font-medium shrink-0">{item.label}</span>
                   )}
                 </React.Fragment>
               ))}
             </nav>
           )}
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-foreground break-words">{title}</h1>
           {description && (
             typeof description === 'string'
-              ? <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{description}</p>
-              : <div className="mt-1 max-w-2xl">{description}</div>
+              ? <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-2xl leading-relaxed">{description}</p>
+              : <div className="mt-1 max-w-2xl text-xs sm:text-sm">{description}</div>
           )}
         </div>
       </div>
 
-      {actions && <div className="flex items-center gap-3 shrink-0">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 w-full sm:w-auto justify-start sm:justify-end">{actions}</div>}
     </div>
   );
 }
