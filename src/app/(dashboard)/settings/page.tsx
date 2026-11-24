@@ -283,42 +283,43 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="organization" className="w-full">
-        <TabsList className="flex items-center justify-start overflow-x-auto w-full p-1 h-auto text-xs">
-          <TabsTrigger value="organization">Organization</TabsTrigger>
-          <TabsTrigger value="users">Team &amp; Roles ({usersMeta?.total ?? teamMembers.length})</TabsTrigger>
-          <TabsTrigger value="thresholds">Alert Thresholds</TabsTrigger>
-          <TabsTrigger value="data-quality">Data Quality Rules (13)</TabsTrigger>
-          <TabsTrigger value="audit">System Audit Logs</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
+        <TabsList className="flex items-center justify-start overflow-x-auto w-full p-1 h-auto text-xs gap-1">
+          <TabsTrigger value="organization" className="shrink-0 whitespace-nowrap">Organization</TabsTrigger>
+          <TabsTrigger value="users" className="shrink-0 whitespace-nowrap">Team &amp; Roles ({usersMeta?.total ?? teamMembers.length})</TabsTrigger>
+          <TabsTrigger value="thresholds" className="shrink-0 whitespace-nowrap">Alert Thresholds</TabsTrigger>
+          <TabsTrigger value="data-quality" className="shrink-0 whitespace-nowrap">Data Quality Rules (13)</TabsTrigger>
+          <TabsTrigger value="audit" className="shrink-0 whitespace-nowrap">System Audit Logs</TabsTrigger>
+          <TabsTrigger value="security" className="shrink-0 whitespace-nowrap">Security</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Organization Profile */}
         <TabsContent value="organization" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Commercial Carrier Identity</CardTitle>
-              <CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">Commercial Carrier Identity</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Organization legal business details and East Africa currency localization
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-xl">
+            <CardContent className="space-y-4 max-w-xl p-4 sm:p-6 pt-0 sm:pt-0">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Company Trading Name</label>
                 <Input
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
                   placeholder="e.g. Simba Hauliers Kenya Ltd"
+                  className="w-full text-xs sm:text-sm"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">Base Currency</label>
-                  <Input value="KES (Kenya Shillings)" disabled className="bg-secondary cursor-not-allowed" />
+                  <Input value="KES (Kenya Shillings)" disabled className="bg-secondary cursor-not-allowed text-xs sm:text-sm" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">Timezone</label>
-                  <Input value="Africa/Nairobi (EAT, UTC+3)" disabled className="bg-secondary cursor-not-allowed" />
+                  <Input value="Africa/Nairobi (EAT, UTC+3)" disabled className="bg-secondary cursor-not-allowed text-xs sm:text-sm" />
                 </div>
               </div>
 
@@ -326,6 +327,7 @@ export default function SettingsPage() {
                 onClick={() => updateOrgMutation.mutate()}
                 disabled={updateOrgMutation.isPending}
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 {updateOrgMutation.isPending ? 'Saving...' : 'Save Profile Changes'}
               </Button>
@@ -336,13 +338,13 @@ export default function SettingsPage() {
         {/* Tab: Security / Change Password */}
         <TabsContent value="security" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Change Password</CardTitle>
-              <CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">Change Password</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Update your account password. You will be signed out and asked to log in again.
               </CardDescription>
             </CardHeader>
-            <CardContent className="max-w-md">
+            <CardContent className="max-w-md p-4 sm:p-6 pt-0 sm:pt-0">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -353,7 +355,7 @@ export default function SettingsPage() {
                 {passwordError && (
                   <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                    <span>{passwordError}</span>
+                    <span className="break-words">{passwordError}</span>
                   </div>
                 )}
 
@@ -368,7 +370,7 @@ export default function SettingsPage() {
                         if (passwordError) setPasswordError(null);
                       }}
                       placeholder="Enter current password"
-                      className="pr-10"
+                      className="pr-10 text-xs sm:text-sm"
                       autoComplete="current-password"
                     />
                     <button
@@ -393,7 +395,7 @@ export default function SettingsPage() {
                         if (passwordError) setPasswordError(null);
                       }}
                       placeholder="Minimum 6 characters"
-                      className="pr-10"
+                      className="pr-10 text-xs sm:text-sm"
                       autoComplete="new-password"
                     />
                     <button
@@ -443,7 +445,7 @@ export default function SettingsPage() {
                         if (passwordError) setPasswordError(null);
                       }}
                       placeholder="Re-enter new password"
-                      className="pr-10"
+                      className="pr-10 text-xs sm:text-sm"
                       autoComplete="new-password"
                     />
                     <button
@@ -469,6 +471,7 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   size="sm"
+                  className="w-full sm:w-auto"
                   disabled={changePasswordMutation.isPending || !canSubmitPassword}
                 >
                   {changePasswordMutation.isPending ? 'Updating...' : 'Update Password'}
@@ -481,22 +484,86 @@ export default function SettingsPage() {
         {/* Tab 2: Team Members & Roles */}
         <TabsContent value="users" className="space-y-4 mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-6 pb-3">
               <div>
-                <CardTitle>Team Members & Access Roles</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-base sm:text-lg">Team Members & Access Roles</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   Roles: Owner, Fleet Manager, Finance Accountant, and Field Driver
                 </CardDescription>
               </div>
               {isOwner && (
-                <Button size="sm" onClick={() => setAddUserModalOpen(true)}>
+                <Button size="sm" onClick={() => setAddUserModalOpen(true)} className="w-full sm:w-auto shrink-0">
                   <Plus className="mr-1.5 h-4 w-4" />
                   <span>Invite Member</span>
                 </Button>
               )}
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              {/* Mobile View: Cards */}
+              <div className="sm:hidden divide-y divide-border">
+                {teamMembers.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">No team members found.</div>
+                ) : (
+                  teamMembers.map((m) => (
+                    <div key={m.id} className="p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                            {m.name[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-foreground text-sm truncate">{m.name}</div>
+                            <div className="text-xs font-mono text-muted-foreground truncate">{m.email}</div>
+                          </div>
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize bg-secondary text-foreground border border-border shrink-0">
+                          {m.role}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-border/50">
+                        <span className="text-muted-foreground font-mono">{m.phone || '—'}</span>
+                        {isOwner && (
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2.5 text-xs"
+                              onClick={() => {
+                                setEditingUser(m);
+                                setEditUserForm({
+                                  name: m.name,
+                                  email: m.email,
+                                  phone: m.phone || '',
+                                  role: (m.role === 'super_admin' ? 'owner' : m.role) as 'owner' | 'manager' | 'accountant' | 'driver',
+                                  password: '',
+                                });
+                              }}
+                              title="Edit user"
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={m.id === currentUser?.id}
+                              onClick={() => setDeletingUser(m)}
+                              title={m.id === currentUser?.id ? 'You cannot delete your own account' : 'Delete user'}
+                              className="h-7 px-2.5 text-xs text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop / Tablet View: Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
@@ -563,9 +630,9 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="flex items-center justify-between p-3 border-t border-border text-xs">
-                <span className="text-muted-foreground">Page {usersMeta?.current_page ?? usersPage} of {usersMeta?.last_page ?? 1} • {usersMeta?.total ?? teamMembers.length} users</span>
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 border-t border-border text-xs">
+                <span className="text-muted-foreground text-center sm:text-left">Page {usersMeta?.current_page ?? usersPage} of {usersMeta?.last_page ?? 1} • {usersMeta?.total ?? teamMembers.length} users</span>
+                <div className="flex gap-2 w-full sm:w-auto justify-center">
                   <Button size="sm" variant="outline" disabled={(usersMeta?.current_page ?? usersPage) <= 1} onClick={() => setUsersPage((p) => Math.max(1, p - 1))}>Prev</Button>
                   <Button size="sm" variant="outline" disabled={(usersMeta?.current_page ?? usersPage) >= (usersMeta?.last_page ?? 1)} onClick={() => setUsersPage((p) => p + 1)}>Next</Button>
                 </div>
@@ -577,36 +644,36 @@ export default function SettingsPage() {
         {/* Tab 3: Alert Thresholds */}
         <TabsContent value="thresholds" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Operations & Fuel Alert Rules</CardTitle>
-              <CardDescription>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-base sm:text-lg">Operations & Fuel Alert Rules</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Automated scheduler scans compliance expiry, overdue invoices and fuel theft
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-xl text-xs">
+            <CardContent className="space-y-4 max-w-xl text-xs p-4 sm:p-6 pt-0 sm:pt-0">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">
                   Fuel Anomaly Threshold (% worse than rolling average)
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <Input
                     type="number"
                     min={5}
                     max={50}
                     value={fuelThreshold}
                     onChange={(e) => setFuelThreshold(Number(e.target.value))}
-                    className="w-32"
+                    className="w-28 sm:w-32 text-xs sm:text-sm"
                   />
-                  <span className="text-muted-foreground font-medium">%</span>
+                  <span className="text-muted-foreground font-medium text-xs sm:text-sm">%</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Default 20.00%. Any refill km/L falling below 80% of vehicle baseline triggers an instant anomaly flag.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-secondary border border-border space-y-1">
-                <p className="font-semibold text-foreground">Compliance Document Renewal Alerts</p>
-                <p className="text-muted-foreground">
+              <div className="p-3 sm:p-3.5 rounded-xl bg-secondary border border-border space-y-1">
+                <p className="font-semibold text-foreground text-xs sm:text-sm">Compliance Document Renewal Alerts</p>
+                <p className="text-muted-foreground text-xs">
                   The automated daily scheduler flags NTSA inspection, speed governor, and commercial insurance expiring within 30 days.
                 </p>
               </div>
@@ -615,6 +682,7 @@ export default function SettingsPage() {
                 onClick={() => updateOrgMutation.mutate()}
                 disabled={updateOrgMutation.isPending}
                 size="sm"
+                className="w-full sm:w-auto"
               >
                 Save Thresholds
               </Button>
@@ -625,23 +693,87 @@ export default function SettingsPage() {
         {/* Tab 4: Advancement C - Data Quality Rule Thresholds */}
         <TabsContent value="data-quality" className="space-y-4 mt-4">
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Continuous Scanner Rule Configuration</CardTitle>
-                  <CardDescription className="text-xs">
-                    Define active detection rules, operational day limits, and cash thresholds for missing fleet entries.
-                  </CardDescription>
-                </div>
-                {currentUser?.role !== 'owner' && currentUser?.role !== 'manager' && (
-                  <span className="text-xs bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2.5 py-1 rounded-md">
-                    Read-only (Owner/Manager required to edit)
-                  </span>
-                )}
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-4 sm:p-6 pb-3">
+              <div>
+                <CardTitle className="text-base sm:text-lg">Continuous Scanner Rule Configuration</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Define active detection rules, operational day limits, and cash thresholds for missing fleet entries.
+                </CardDescription>
               </div>
+              {currentUser?.role !== 'owner' && currentUser?.role !== 'manager' && (
+                <span className="text-xs bg-amber-500/10 text-amber-600 border border-amber-500/20 px-2.5 py-1 rounded-md self-start sm:self-auto">
+                  Read-only (Owner/Manager required)
+                </span>
+              )}
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              {/* Mobile View: Cards */}
+              <div className="sm:hidden divide-y divide-border">
+                {pagedRuleEntries.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">No data quality rules found.</div>
+                ) : (
+                  pagedRuleEntries.map(([key, rule]) => {
+                    const canEdit = currentUser?.role === 'owner' || currentUser?.role === 'manager';
+                    return (
+                      <div key={key} className="p-3.5 space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-foreground text-xs sm:text-sm">{rule.label}</div>
+                            <div className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{rule.description}</div>
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                              rule.enabled
+                                ? 'bg-success/15 text-success'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
+                          >
+                            {rule.enabled ? 'Active' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="bg-secondary px-2 py-0.5 rounded text-[10px] font-medium text-foreground">
+                              {rule.category}
+                            </span>
+                            {rule.threshold_days !== null && (
+                              <span className="font-mono text-[11px] text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                                {rule.threshold_days}d limit
+                              </span>
+                            )}
+                            {rule.threshold_amount !== null && rule.threshold_amount !== undefined && (
+                              <span className="font-mono text-[11px] text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                                KSh {Number(rule.threshold_amount).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          {canEdit && (
+                            <Button
+                              size="sm"
+                              variant={rule.enabled ? 'outline' : 'default'}
+                              className="h-7 text-xs px-2.5 shrink-0"
+                              disabled={updateRuleMutation.isPending}
+                              onClick={() =>
+                                updateRuleMutation.mutate({
+                                  rule_key: key,
+                                  is_enabled: !rule.enabled,
+                                  threshold_days: rule.threshold_days,
+                                  threshold_amount: rule.threshold_amount,
+                                })
+                              }
+                            >
+                              {rule.enabled ? 'Disable' : 'Enable'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop / Tablet View: Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-xs min-w-[700px]">
                   <thead className="bg-secondary/60 text-muted-foreground uppercase border-y border-border">
                     <tr>
@@ -684,7 +816,7 @@ export default function SettingsPage() {
                                 <span>{rule.threshold_days} days</span>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground">â€”</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
                           <td className="py-3 px-3">
@@ -693,7 +825,7 @@ export default function SettingsPage() {
                                 KSh {Number(rule.threshold_amount).toLocaleString()}
                               </div>
                             ) : (
-                              <span className="text-muted-foreground">â€”</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
                           <td className="py-3 px-3 text-right">
@@ -722,9 +854,9 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="flex items-center justify-between p-3 border-t border-border text-xs">
-                <span className="text-muted-foreground">Page {safeRulesPage} of {rulesLastPage} • {ruleEntries.length} rules</span>
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 border-t border-border text-xs">
+                <span className="text-muted-foreground text-center sm:text-left">Page {safeRulesPage} of {rulesLastPage} • {ruleEntries.length} rules</span>
+                <div className="flex gap-2 w-full sm:w-auto justify-center">
                   <Button size="sm" variant="outline" disabled={safeRulesPage <= 1} onClick={() => setRulesPage((p) => Math.max(1, p - 1))}>Prev</Button>
                   <Button size="sm" variant="outline" disabled={safeRulesPage >= rulesLastPage} onClick={() => setRulesPage((p) => Math.min(rulesLastPage, p + 1))}>Next</Button>
                 </div>
@@ -736,14 +868,41 @@ export default function SettingsPage() {
         {/* Tab 5: System Audit Logs */}
         <TabsContent value="audit" className="space-y-4 mt-4">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Audit Trail Logs</CardTitle>
-              <CardDescription>
+            <CardHeader className="p-4 sm:p-6 pb-3">
+              <CardTitle className="text-base sm:text-lg">Audit Trail Logs</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 Tracks critical operational actions: expense reassignments, payment recordings, and compliance changes
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              {/* Mobile View: Cards */}
+              <div className="sm:hidden divide-y divide-border">
+                {auditLogs.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">No audit logs found.</div>
+                ) : (
+                  auditLogs.map((log) => (
+                    <div key={log.id} className="p-3.5 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-foreground text-xs truncate">
+                          {log.user?.name || 'System Scheduler'}
+                        </span>
+                        <span className="font-mono text-[10px] font-semibold text-primary uppercase bg-primary/10 px-2 py-0.5 rounded shrink-0">
+                          {log.action}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground break-words">
+                        {log.reason || 'Record updated'}
+                      </div>
+                      <div className="text-[11px] font-mono text-muted-foreground/75 pt-1">
+                        {formatDateTime(log.created_at)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop / Tablet View: Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm min-w-[650px]">
                   <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-y border-border">
                     <tr>
@@ -775,9 +934,9 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="flex items-center justify-between p-3 border-t border-border text-xs">
-                <span className="text-muted-foreground">Page {auditMeta?.current_page ?? auditPage} of {auditMeta?.last_page ?? 1} • {auditMeta?.total ?? auditLogs.length} logs</span>
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 border-t border-border text-xs">
+                <span className="text-muted-foreground text-center sm:text-left">Page {auditMeta?.current_page ?? auditPage} of {auditMeta?.last_page ?? 1} • {auditMeta?.total ?? auditLogs.length} logs</span>
+                <div className="flex gap-2 w-full sm:w-auto justify-center">
                   <Button size="sm" variant="outline" disabled={(auditMeta?.current_page ?? auditPage) <= 1} onClick={() => setAuditPage((p) => Math.max(1, p - 1))}>Prev</Button>
                   <Button size="sm" variant="outline" disabled={(auditMeta?.current_page ?? auditPage) >= (auditMeta?.last_page ?? 1)} onClick={() => setAuditPage((p) => p + 1)}>Next</Button>
                 </div>
@@ -789,7 +948,7 @@ export default function SettingsPage() {
 
       {/* Invite User Dialog */}
       <Dialog open={addUserModalOpen} onOpenChange={setAddUserModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)] max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Invite Team Member</DialogTitle>
             <DialogDescription>
@@ -826,8 +985,8 @@ export default function SettingsPage() {
                 className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="owner">Owner (Full administrative control)</option>
-                <option value="manager">Manager (Fleet, dispatches & drivers)</option>
-                <option value="accountant">Accountant (Invoices, billing & advances)</option>
+                <option value="manager">Manager (Fleet, dispatches &amp; drivers)</option>
+                <option value="accountant">Accountant (Invoices, billing &amp; advances)</option>
                 <option value="driver">Driver (Mobile camera expense submission)</option>
               </select>
             </div>
@@ -840,16 +999,17 @@ export default function SettingsPage() {
               )}
             </div>
 
-            <DialogFooter className="mt-6">
+            <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
+                className="w-full sm:w-auto"
                 onClick={() => setAddUserModalOpen(false)}
                 disabled={createUserMutation.isPending}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createUserMutation.isPending}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={createUserMutation.isPending}>
                 {createUserMutation.isPending ? 'Inviting...' : 'Add Team Member'}
               </Button>
             </DialogFooter>
@@ -859,7 +1019,7 @@ export default function SettingsPage() {
 
       {/* Edit User Dialog (Owner Only) */}
       <Dialog open={Boolean(editingUser)} onOpenChange={(open) => !open && setEditingUser(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)] max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Team Member</DialogTitle>
             <DialogDescription>
@@ -936,16 +1096,17 @@ export default function SettingsPage() {
               />
             </div>
 
-            <DialogFooter className="mt-6">
+            <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
+                className="w-full sm:w-auto"
                 onClick={() => setEditingUser(null)}
                 disabled={updateUserMutation.isPending}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={updateUserMutation.isPending}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={updateUserMutation.isPending}>
                 {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
               </Button>
             </DialogFooter>
@@ -955,17 +1116,18 @@ export default function SettingsPage() {
 
       {/* Delete User Confirmation Dialog (Owner Only) */}
       <Dialog open={Boolean(deletingUser)} onOpenChange={(open) => !open && setDeletingUser(null)}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle className="text-destructive">Remove Team Member</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete <strong>{deletingUser?.name}</strong> ({deletingUser?.email})? They will immediately lose access to the system.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => setDeletingUser(null)}
               disabled={deleteUserMutation.isPending}
             >
@@ -974,6 +1136,7 @@ export default function SettingsPage() {
             <Button
               type="button"
               variant="destructive"
+              className="w-full sm:w-auto"
               disabled={deleteUserMutation.isPending}
               onClick={() => deletingUser && deleteUserMutation.mutate(deletingUser.id)}
             >
