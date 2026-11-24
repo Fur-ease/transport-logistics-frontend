@@ -137,7 +137,7 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:max-w-md">
+      <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {mode === 'couple' ? (
@@ -194,7 +194,7 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Coupled On *</label>
                 <Input type="date" {...coupleForm.register('coupled_at')} />
@@ -233,14 +233,14 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={coupleMutation.isPending || !!currentTrailer}
-                className="font-semibold"
+                className="w-full sm:w-auto font-semibold"
               >
                 {coupleMutation.isPending ? 'Coupling...' : 'Couple Trailer'}
               </Button>
@@ -252,7 +252,7 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
             className="space-y-4 py-4"
           >
             <div className="p-3 rounded-xl border border-border bg-secondary/50 flex items-center gap-3">
-              <Container className="h-8 w-8 text-primary" />
+              <Container className="h-8 w-8 text-primary shrink-0" />
               <div className="text-xs">
                 <p className="font-mono font-bold text-sm text-foreground">
                   {currentTrailer?.reg_number ?? 'No trailer coupled'}
@@ -286,7 +286,7 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">
                   Uncoupled On *
@@ -311,15 +311,15 @@ export function CouplingDialog({ mode, truck, open, onOpenChange }: CouplingDial
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="destructive"
                 disabled={uncoupleMutation.isPending || !currentTrailer}
-                className="font-semibold"
+                className="w-full sm:w-auto font-semibold"
               >
                 {uncoupleMutation.isPending ? 'Uncoupling...' : 'Confirm Uncouple'}
               </Button>

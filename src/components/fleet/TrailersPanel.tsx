@@ -355,22 +355,22 @@ export function TrailersPanel() {
       </div>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search trailer plate, type, make..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9 h-9 text-xs"
+            className="pl-9 h-9 text-xs w-full"
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setFiltersOpen((v) => !v)}
-            className="h-9 text-xs"
+            className="h-9 text-xs flex-1 sm:flex-none justify-center"
           >
             <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
             Filters
@@ -381,7 +381,7 @@ export function TrailersPanel() {
               Clear
             </Button>
           )}
-          <Button onClick={openCreate} size="sm">
+          <Button onClick={openCreate} size="sm" className="h-9 flex-1 sm:flex-none justify-center">
             <Plus className="mr-1.5 h-4 w-4" />
             <span>Add Trailer</span>
           </Button>
@@ -389,7 +389,7 @@ export function TrailersPanel() {
       </div>
 
       {filtersOpen && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl border border-border bg-card">
           <div>
             <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
               Trailer Type
@@ -454,14 +454,14 @@ export function TrailersPanel() {
       )}
 
       {/* Status chips with live counts */}
-      <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
         {statusOptions.map((st) => {
           const count = st.key === 'all' ? stats?.all : stats?.[st.key as keyof NonNullable<typeof stats>];
           return (
             <button
               key={st.key}
               onClick={() => setStatusFilter(st.key)}
-              className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-full capitalize font-medium transition-colors border cursor-pointer whitespace-nowrap shrink-0 ${
                 statusFilter === st.key
                   ? 'bg-primary text-white border-primary font-semibold shadow-sm'
                   : 'bg-card text-muted-foreground border-border hover:text-foreground'
@@ -501,66 +501,124 @@ export function TrailersPanel() {
           onAction={hasActiveFilters ? resetFilters : openCreate}
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
-              <tr>
-                <th className="py-3 px-4 text-left font-medium">Trailer Plate</th>
-                <th className="py-3 px-4 text-left font-medium">Specs</th>
-                <th className="py-3 px-4 text-left font-medium">Type & Capacity</th>
-                <th className="py-3 px-4 text-left font-medium">Coupled To</th>
-                <th className="py-3 px-4 text-center font-medium">Trips</th>
-                <th className="py-3 px-4 text-center font-medium">Status</th>
-                <th className="py-3 px-4 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {trailers.map((trailer) => (
-                <tr key={trailer.id} className="hover:bg-muted/40 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-2">
-                      <Container className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-mono font-bold text-sm text-foreground">{trailer.reg_number}</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <p className="font-medium text-foreground">
-                      {trailer.make || 'â€”'} {trailer.model || ''}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{trailer.year || 'â€”'}</p>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <p className="font-medium text-xs capitalize">{trailer.type.replace('_', ' ')}</p>
-                    <p className="text-xs text-muted-foreground tabular-nums flex items-center gap-1">
+        <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+          {/* Mobile Cards View (sm:hidden) */}
+          <div className="sm:hidden divide-y divide-border">
+            {trailers.map((trailer) => (
+              <div key={trailer.id} className="p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Container className="h-4 w-4 text-primary shrink-0" />
+                    <span className="font-mono font-bold text-sm text-foreground">{trailer.reg_number}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <StatusBadge status={trailer.status} />
+                    {renderRowActions(trailer)}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs py-1">
+                  <div>
+                    <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Make / Model</span>
+                    <span className="font-medium text-foreground text-xs">
+                      {trailer.make || '—'} {trailer.model || ''}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground block">{trailer.year || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-semibold text-muted-foreground block">Type & Capacity</span>
+                    <span className="font-medium text-xs capitalize block">{trailer.type.replace('_', ' ')}</span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums flex items-center gap-1">
                       <Weight className="h-3 w-3" /> {trailer.capacity_tons} tons
-                    </p>
-                  </td>
-                  <td className="py-3.5 px-4">
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-border/50">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-muted-foreground">Coupled:</span>
                     {trailer.active_assignment?.truck ? (
                       <Link
                         href={`/trucks/${trailer.active_assignment.truck.id}`}
-                        className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-primary hover:underline"
+                        className="inline-flex items-center gap-1 font-mono text-xs font-bold text-primary hover:underline"
                       >
-                        <Link2 className="h-3.5 w-3.5" />
+                        <Link2 className="h-3 w-3" />
                         {trailer.active_assignment.truck.reg_number}
                       </Link>
                     ) : (
                       <span className="text-xs text-muted-foreground">Not coupled</span>
                     )}
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
-                      {trailer.trips_count ?? 0}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <StatusBadge status={trailer.status} />
-                  </td>
-                  <td className="py-3.5 px-4 text-right">{renderRowActions(trailer)}</td>
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
+                    {trailer.trips_count ?? 0} trips
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View (hidden sm:block) */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead className="bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border">
+                <tr>
+                  <th className="py-3 px-4 text-left font-medium">Trailer Plate</th>
+                  <th className="py-3 px-4 text-left font-medium">Specs</th>
+                  <th className="py-3 px-4 text-left font-medium">Type & Capacity</th>
+                  <th className="py-3 px-4 text-left font-medium">Coupled To</th>
+                  <th className="py-3 px-4 text-center font-medium">Trips</th>
+                  <th className="py-3 px-4 text-center font-medium">Status</th>
+                  <th className="py-3 px-4 text-right font-medium">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {trailers.map((trailer) => (
+                  <tr key={trailer.id} className="hover:bg-muted/40 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-2">
+                        <Container className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-mono font-bold text-sm text-foreground">{trailer.reg_number}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <p className="font-medium text-foreground">
+                        {trailer.make || '—'} {trailer.model || ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{trailer.year || '—'}</p>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <p className="font-medium text-xs capitalize">{trailer.type.replace('_', ' ')}</p>
+                      <p className="text-xs text-muted-foreground tabular-nums flex items-center gap-1">
+                        <Weight className="h-3 w-3" /> {trailer.capacity_tons} tons
+                      </p>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {trailer.active_assignment?.truck ? (
+                        <Link
+                          href={`/trucks/${trailer.active_assignment.truck.id}`}
+                          className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-primary hover:underline"
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          {trailer.active_assignment.truck.reg_number}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not coupled</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 tabular-nums">
+                        {trailer.trips_count ?? 0}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <StatusBadge status={trailer.status} />
+                    </td>
+                    <td className="py-3.5 px-4 text-right">{renderRowActions(trailer)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -618,7 +676,7 @@ export function TrailersPanel() {
           if (!open) setEditingTrailer(null);
         }}
       >
-        <SheetContent side="right" className="sm:max-w-md">
+        <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               {editingTrailer ? `Edit Trailer ${editingTrailer.reg_number}` : 'Register New Trailer'}
@@ -643,7 +701,7 @@ export function TrailersPanel() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Make</label>
                 <Input placeholder="Afrit / Tiger / CIMC" {...register('make')} />
@@ -654,7 +712,7 @@ export function TrailersPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">Trailer Type</label>
                 <select
@@ -677,7 +735,7 @@ export function TrailersPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-foreground block mb-1">
                   Payload Capacity (Tons)
@@ -704,7 +762,7 @@ export function TrailersPanel() {
               <label className="text-xs font-semibold text-foreground block mb-1">Status</label>
               {editingTrailer?.active_assignment ? (
                 <div className="h-10 px-3 flex items-center rounded-lg border border-border bg-secondary/60 text-sm text-foreground">
-                  In Use â€” coupled to {editingTrailer.active_assignment.truck?.reg_number ?? 'a truck head'}
+                  In Use — coupled to {editingTrailer.active_assignment.truck?.reg_number ?? 'a truck head'}
                 </div>
               ) : (
                 <select
@@ -733,16 +791,17 @@ export function TrailersPanel() {
               </div>
             )}
 
-            <SheetFooter className="mt-6">
+            <SheetFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
+                className="w-full sm:w-auto"
                 onClick={() => setSheetOpen(false)}
                 disabled={isSaving}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={isSaving}>
                 {isSaving ? 'Saving...' : editingTrailer ? 'Save Changes' : 'Register Trailer'}
               </Button>
             </SheetFooter>

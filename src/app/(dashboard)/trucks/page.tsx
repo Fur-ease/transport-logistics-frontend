@@ -364,10 +364,10 @@ export default function TrucksPage() {
       />
 
       {/* Fleet Segmented Tabs */}
-      <div className="inline-flex items-center rounded-lg border border-border bg-card p-1 shadow-sm">
+      <div className="flex w-full sm:w-auto items-center rounded-lg border border-border bg-card p-1 shadow-sm">
         <button
           onClick={() => setFleetTab('heads')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+          className={`flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
             fleetTab === 'heads'
               ? 'bg-primary text-white shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -378,7 +378,7 @@ export default function TrucksPage() {
         </button>
         <button
           onClick={() => setFleetTab('trailers')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+          className={`flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
             fleetTab === 'trailers'
               ? 'bg-primary text-white shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -791,7 +791,7 @@ export default function TrucksPage() {
               if (!open) setEditingTruck(null);
             }}
           >
-            <SheetContent side="right" className="sm:max-w-md">
+            <SheetContent side="right" className="w-[calc(100vw-1rem)] sm:max-w-md max-h-[92vh] overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>
                   {editingTruck ? `Edit Truck ${editingTruck.reg_number}` : 'Register New Truck'}
@@ -818,7 +818,7 @@ export default function TrucksPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-foreground block mb-1">Make</label>
                     <Input placeholder="Scania / Isuzu / Actros" {...register('make')} />
@@ -835,7 +835,7 @@ export default function TrucksPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-foreground block mb-1">Year of Manufacture</label>
                     <Input type="number" {...register('year', { valueAsNumber: true })} />
@@ -858,7 +858,7 @@ export default function TrucksPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-foreground block mb-1">Capacity (Tons)</label>
                     <Input type="number" step="0.1" {...register('capacity_tons', { valueAsNumber: true })} />
@@ -894,16 +894,17 @@ export default function TrucksPage() {
                   )}
                 </div>
 
-                <SheetFooter className="mt-6">
+                <SheetFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="w-full sm:w-auto"
                     onClick={() => setSheetOpen(false)}
                     disabled={isSaving}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSaving}>
+                  <Button type="submit" className="w-full sm:w-auto" disabled={isSaving}>
                     {isSaving
                       ? 'Saving...'
                       : editingTruck

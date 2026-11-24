@@ -478,7 +478,7 @@ export default function TruckDetailPage() {
           </div>
 
           <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div>
                 <CardTitle className="text-sm">Current Haulage Combination</CardTitle>
                 <CardDescription>Active truck head and trailer coupling</CardDescription>
@@ -488,7 +488,7 @@ export default function TruckDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setUncoupleOpen(true)}
-                  className="text-destructive hover:text-destructive"
+                  className="w-full sm:w-auto text-destructive hover:text-destructive"
                 >
                   <Unlink className="mr-1.5 h-3.5 w-3.5" />
                   Uncouple
@@ -499,7 +499,7 @@ export default function TruckDetailPage() {
               {truck.current_assignment?.trailer ? (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-primary/20 bg-primary/5">
                   <div className="flex items-center gap-3">
-                    <Container className="h-9 w-9 text-primary" />
+                    <Container className="h-9 w-9 text-primary shrink-0" />
                     <div>
                       <p className="font-mono text-lg font-bold text-foreground">
                         {truck.current_assignment.trailer.reg_number}
@@ -537,7 +537,7 @@ export default function TruckDetailPage() {
                     This truck head is not coupled to any trailer. Couple an available trailer before
                     dispatching a haulage trip.
                   </p>
-                  <Button size="sm" variant="outline" onClick={() => setCoupleOpen(true)}>
+                  <Button size="sm" variant="outline" className="w-full sm:w-auto shrink-0" onClick={() => setCoupleOpen(true)}>
                     <Link2 className="mr-1.5 h-3.5 w-3.5" />
                     Couple Trailer
                   </Button>
