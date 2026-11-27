@@ -204,17 +204,17 @@ export default function DashboardPage() {
 
       {/* KPI Stat Cards Grid */}
       {isInitialLoad ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-4">
           {[...Array(6)].map((_, i) => (
-            <Card key={i} className="p-4 space-y-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-8 w-28" />
-              <Skeleton className="h-3 w-16" />
+            <Card key={i} className="p-3.5 sm:p-4 space-y-2">
+              <Skeleton className="h-3 sm:h-4 w-16 sm:w-20" />
+              <Skeleton className="h-6 sm:h-8 w-20 sm:w-28" />
+              <Skeleton className="h-2.5 sm:h-3 w-12 sm:w-16" />
             </Card>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-4">
           <StatCard
             title="Active Trips"
             value={stats?.kpis.active_trips ?? 0}

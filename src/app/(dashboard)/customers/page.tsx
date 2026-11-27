@@ -104,20 +104,20 @@ export default function CustomersPage() {
       />
 
       {/* Overview Metric Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Corporate Clients</p>
-          <p className="text-2xl font-bold text-foreground mt-1 tabular-nums">{summary?.total_customers ?? meta?.total ?? customers.length}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4">
+        <Card className="p-3.5 sm:p-4">
+          <p className="text-[11px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Corporate Clients</p>
+          <p className="text-xl sm:text-2xl font-bold text-foreground mt-1 tabular-nums break-words">{summary?.total_customers ?? meta?.total ?? customers.length}</p>
         </Card>
-        <Card className="p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Invoiced (KES)</p>
-          <p className="text-2xl font-bold text-primary mt-1 tabular-nums">
+        <Card className="p-3.5 sm:p-4">
+          <p className="text-[11px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Invoiced (KES)</p>
+          <p className="text-xl sm:text-2xl font-bold text-primary mt-1 tabular-nums break-words">
             {formatKES(summary?.total_invoiced ?? 0)}
           </p>
         </Card>
-        <Card className="p-4 border-destructive/30">
-          <p className="text-xs font-medium uppercase tracking-wider text-destructive">Total Outstanding Receivables</p>
-          <p className="text-2xl font-bold text-destructive mt-1 tabular-nums">
+        <Card className="p-3.5 sm:p-4 border-destructive/30 col-span-2 sm:col-span-1">
+          <p className="text-[11px] sm:text-xs font-medium uppercase tracking-wider text-destructive">Total Outstanding Receivables</p>
+          <p className="text-xl sm:text-2xl font-bold text-destructive mt-1 tabular-nums break-words">
             {formatKES(totalReceivables)}
           </p>
         </Card>
